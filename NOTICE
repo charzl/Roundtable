@@ -1,0 +1,10 @@
+Roundtable (圆桌会议)
+
+Original project code is licensed under Apache License 2.0.
+The stream event extraction helpers in src/providers/events.js are adapted
+from ai-us-stock-lab/roundtable, commit
+ec07e195e802d52a6754a09eac8fda21c70143f7 (MIT).
+Its original license is preserved in third_party/roundtable/LICENSE.
+
+The read-only upstream research snapshot under output/research is not
+relicensed by this project. Third-party files retain their original terms.

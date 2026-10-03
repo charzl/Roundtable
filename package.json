@@ -1,0 +1,24 @@
+{
+  "name": "roundtable-desktop",
+  "version": "0.1.0",
+  "private": true,
+  "description": "圆桌会议：本地人类与真实 agent 会议",
+  "license": "Apache-2.0",
+  "type": "module",
+  "main": "src/desktop/main.js",
+  "scripts": {
+    "start": "electron .",
+    "serve": "node src/service/cli.js",
+    "test": "node --test tests/*.test.js",
+    "check": "node scripts/check.js",
+    "smoke:providers": "node scripts/smoke-providers.js",
+    "smoke:desktop": "node scripts/smoke-desktop.js",
+    "build:mac": "node scripts/build-mac.js",
+    "smoke:meeting": "node scripts/smoke-meeting.js",
+    "smoke:packaged": "node scripts/smoke-desktop.js --packaged"
+  },
+  "devDependencies": {
+    "electron": "44.5.1",
+    "playwright": "1.58.2"
+  }
+}

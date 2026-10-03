@@ -1,0 +1,23 @@
+<!doctype html>
+<html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>圆桌会议 · Roundtable</title><link rel="stylesheet" href="/style.css"><script src="/app.js" defer></script></head>
+<body>
+<header class="bar"><div class="brand"><span class="brand-icon">◌</span><div>圆桌会议 <small>Roundtable</small></div></div><div class="bar-actions"><span id="connection">正在连接本地服务</span><button id="settings-button">共享能力</button><button id="new-button" class="primary">＋ 新会议</button></div></header>
+<div id="error" class="error" role="alert" hidden></div>
+<div class="layout">
+<aside class="sidebar"><h2>会议记录</h2><div id="meeting-list"></div><div class="sidebar-note">一次一位公开发言<br>最多 10 轮 · 可以提前总结<br>决定始终由你做出</div><section id="participants"></section></aside>
+<main>
+<section id="welcome" class="welcome"><div class="eyebrow">把不同的判断放在同一张桌上</div><h1>一个问题，多方推敲。</h1><p>让真实的 agent 读取共同记录，互相提问、核查和回应。把依据和异议留下来，再由你判断。</p><button id="welcome-new" class="primary">开始一场圆桌会议</button><div id="provider-overview"></div></section>
+<section id="meeting" hidden>
+<div class="meeting-heading"><div><div class="eyebrow" id="round-label"></div><h1 id="topic"></h1></div><button id="export-button">导出</button></div>
+<div class="tabs" role="tablist"><button role="tab" aria-selected="true" data-tab="discussion">公开讨论</button><button role="tab" aria-selected="false" data-tab="decision">决策稿</button></div>
+<div class="controls"><span id="turn-state" aria-live="polite"></span><div><button id="start-button" class="primary">开始讨论</button><button id="pause-button">暂停</button><button id="finish-button">结束并总结</button></div></div>
+<div id="meeting-error" class="error" hidden></div>
+<section id="discussion-panel"><div id="messages"></div><div id="pending"></div><form id="composer"><label for="message-input">插话或补充判断标准</label><textarea id="message-input" rows="3" placeholder="例如：请先核实这个假设，再讨论方案。" maxlength="12000"></textarea><div class="compose-actions"><span id="compose-note">发言会加入共同会议记录。</span><button type="submit" class="primary">提交发言</button></div></form></section>
+<section id="decision-panel" hidden></section>
+</section>
+</main>
+<aside class="evidence"><h2>观点与证据</h2><p class="muted">引用来源不代表已验证。核查记录保留作者与方法。</p><div id="evidence-content"><div class="empty">选择一条观点，查看它的依据、方法和限制。</div></div><section id="research"></section></aside>
+</div>
+<dialog id="new-dialog"><form id="new-form"><div class="dialog-header"><h2>新圆桌会议</h2><button type="button" data-close="new-dialog" aria-label="关闭">×</button></div><label for="topic-input">想一起讨论什么？</label><textarea id="topic-input" rows="4" required maxlength="12000" placeholder="说明问题、目标，以及你重视的判断标准。"></textarea><fieldset><legend>选择参会者 · 至少两位</legend><div id="provider-choices"></div></fieldset><div class="round-setting"><label for="round-input">最多讨论轮数</label><input id="round-input" type="number" min="1" max="10" value="10" required></div><p class="muted">每轮让每位参会者发言一次。全员认为材料足够时可提前总结；否则到上限交付决策稿。调用使用本机已有账号，可能消耗其额度。</p><div class="dialog-actions"><button type="button" data-close="new-dialog">取消</button><button type="submit" class="primary">创建会议</button></div></form></dialog>
+<dialog id="settings-dialog"><div class="dialog-header"><h2>共享能力</h2><button data-close="settings-dialog" aria-label="关闭">×</button></div><p>这份配置由会议统一维护。Codex 和 Claude 接收同一份 MCP 配置；是否成功调用以各回合的工具事件为准。</p><h3>会议证据库</h3><p class="muted">公开记录、共享研究、观点核查。每次调用只授权访问当前会议。</p><h3>共同讨论规范</h3><pre id="skill-info"></pre><h3>外部 MCP</h3><p class="muted">修改只用于之后创建的会议。敏感凭据可用 envRefs 引用环境变量。需要授权自动调用的外部工具，用 allowedTools 列出具体名称。AGY 的本项目 MCP 配置适配尚未验证。</p><textarea id="mcp-config" rows="10" spellcheck="false" aria-label="共享 MCP 配置"></textarea><div class="dialog-actions"><button id="save-settings" class="primary">保存配置</button></div></dialog>
+</body></html>

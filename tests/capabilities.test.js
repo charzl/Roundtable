@@ -1,0 +1,9 @@
+import test from 'node:test';import assert from 'node:assert/strict';import {mkdtempSync,mkdirSync,readFileSync,rmSync} from 'node:fs';import {tmpdir} from 'node:os';import {join} from 'node:path';
+import {Capabilities,validateMcp} from '../src/shared/capabilities.js';import {buildInvocation} from '../src/providers/cli.js';
+test('shared config adapts to both providers without placing env credentials in Codex argv',t=>{
+ const root=mkdtempSync(join(tmpdir(),'roundtable-caps-test-'));t.after(()=>rmSync(root,{recursive:true,force:true}));const caps=new Capabilities(join(root,'shared'));const meetingDir=join(root,'meeting'),callDir=join(meetingDir,'call');mkdirSync(meetingDir);caps.update({mcpServers:{research:{command:'fixture-command',args:[],env:{FIXTURE_SECRET:'fixture-value'},allowedTools:['read_doc']}}});
+ const prepared=caps.prepare({meetingDir,callDir,participant:'codex',callId:'fixture',snapshot:caps.info()});const invoke=buildInvocation('codex',{...prepared,prompt:'fixture',workspace:root});assert.ok(!invoke.args.join(' ').includes('fixture-value'));assert.equal(prepared.extraEnv.FIXTURE_SECRET,'fixture-value');assert.ok(invoke.args.includes('mcp_servers.research.enabled_tools=["read_doc"]'));assert.deepEqual(prepared.claudeAllowedTools,['mcp__research__read_doc']);const claude=JSON.parse(readFileSync(prepared.mcpFile));assert.equal(claude.mcpServers.research.env.FIXTURE_SECRET,'fixture-value');assert.equal(claude.mcpServers.research.allowedTools,undefined);caps.revoke(meetingDir,callDir);assert.equal(JSON.parse(readFileSync(prepared.mcpFile)).redacted,true);
+});
+test('unknown fields, reserved names and blanket tool wildcards are rejected',()=>{
+ assert.throws(()=>validateMcp({mcpServers:{roundtable:{command:'x'}}}));assert.throws(()=>validateMcp({mcpServers:{a:{command:'x',allowedTools:['*']}}}));assert.throws(()=>validateMcp({mcpServers:{a:{command:'x',unrecognized:true}}}));
+});

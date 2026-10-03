@@ -1,8 +1,12 @@
+node_modules/
+dist/
+.roundtable/
+# Local mockups, upstream research snapshots and verification artifacts.
+output/
 .DS_Store
+*.log
 .env
 .env.*
 !.env.example
-node_modules/
-dist/
 .build/
 DerivedData/
