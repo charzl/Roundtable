@@ -33,6 +33,7 @@ jobs:
         with:
           node-version: 22
           cache: 'npm'
+          cache-dependency-path: 'javascript/package-lock.json'
 
       - name: Set up Python 3.11
         uses: actions/setup-python@v5
