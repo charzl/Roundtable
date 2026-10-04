@@ -55,7 +55,7 @@ jobs:
       - name: Run Primary Swift Native Build
         run: swift build --package-path swift
 
-      - name: Package all stacks (Primary: Swift & Python, Reference: JS)
+      - name: "Package all stacks (Primary: Swift & Python, Reference: JS)"
         run: node package-all.js
 
       - name: Verify package artifacts
