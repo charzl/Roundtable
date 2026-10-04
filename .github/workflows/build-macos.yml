@@ -4,7 +4,7 @@ on:
   push:
     branches:
       - main
-      - charzl/macos-github-runner
+      - 'charzl/**'
     tags:
       - 'v*'
   pull_request:
@@ -47,6 +47,9 @@ jobs:
 
       - name: Package macOS application (ARM64 DMG & ZIP)
         run: npm run package:mac
+
+      - name: Run post-packaging verification tests
+        run: node --test tests/package.test.js
 
       - name: Verify package artifacts
         run: |

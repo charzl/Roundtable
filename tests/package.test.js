@@ -24,9 +24,7 @@ test('packageWin and packageLinux guard platform requirements', () => {
   if (process.platform !== 'win32') {
     assert.throws(() => packageWin(resolve('.')), /Windows/);
   }
-  if (process.platform !== 'linux') {
-    assert.throws(() => packageLinux(resolve('.')), /Linux/);
-  }
+  assert.throws(() => packageLinux(resolve('.')), /Linux/);
 });
 
 test('packaging produces valid DMG, ZIP and matching SHA256 checksums if built', () => {
