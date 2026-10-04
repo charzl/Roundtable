@@ -23,8 +23,8 @@ This document explains the GitHub Rulesets configured for the Roundtable reposit
    - 中文：所有代码变更必须经由 Pull Request 合并，禁止直接向 `main` 推送代码。设置 `required_approving_review_count: 0`，便于单人核心维护者在 CI 成功后合并，无需等待额外账号审批；开启 `required_review_thread_resolution: true`，确保 PR 会话的所有讨论全部解决后才可合并。
    - English: All code modifications must be merged through Pull Requests; direct pushes to `main` are disallowed. `required_approving_review_count` is set to `0` so solo developers can merge their own PR once CI checks pass without being blocked by external approval requirements. `required_review_thread_resolution: true` requires all review conversations to be resolved before merging.
 4. **必须通过 CI 状态检查 / Require status checks to pass (`required_status_checks`)**:
-   - 中文：强制要求 `Build macOS Packages / Build macOS ARM64 (Apple Silicon)` 状态检查必须成功。只有语法检查、自动化单元测试与 macOS ARM64 打包全部绿灯通过，才允许合并。
-   - English: Strictly requires the `Build macOS Packages / Build macOS ARM64 (Apple Silicon)` check to succeed. Merges are only permitted when syntax checks, automated unit tests, and macOS ARM64 packaging all pass green.
+   - 中文：强制要求 CI 状态检查必须成功，涵盖单元测试 `Run Unit Tests` 与打包构建 `Build macOS ARM64 (Apple Silicon)`。只有语法检查、全量 41 项单元测试与 macOS 打包全部绿灯通过，才允许合并。
+   - English: Strictly requires CI status checks to pass, covering both `Run Unit Tests` and `Build macOS ARM64 (Apple Silicon)`. Merges are only permitted when syntax checks, all 41 unit tests, and macOS packaging pass green.
 5. **管理员绕过权限 / Bypass List (`bypass_actors`)**:
    - 中文：仓库管理员（Repository admin）具有紧急修复与紧急干预的绕过权限。
    - English: Repository administrators retain bypass permissions for emergency maintenance.

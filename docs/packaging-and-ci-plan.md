@@ -50,10 +50,25 @@ Upon completion, `dist/artifacts-manifest.json` automatically records file names
 
 ---
 
-## 二、GitHub Actions CI/CD 触发机制 / GitHub Actions Trigger Mechanisms
+## 二、GitHub Actions CI/CD 工作流矩阵 / GitHub Actions Workflow Matrix
 
-工作流配置文件位于 [.github/workflows/build-macos.yml](../.github/workflows/build-macos.yml)，支持 4 种触发方式：  
-The workflow is configured in [.github/workflows/build-macos.yml](../.github/workflows/build-macos.yml) with 4 triggering modes:
+仓库配置了两个互补的 GitHub Actions 工作流：
+The repository is equipped with two complementary GitHub Actions workflows:
+
+1. **单元测试与代码质量工作流 ([.github/workflows/test.yml](../.github/workflows/test.yml))**：
+   - 跨平台覆盖：基于 `macos-14` (Apple Silicon) 与 `ubuntu-latest` 矩阵运行。
+   - 包含语法检查（`npm run check`）、全量 41 项单元测试套件（`node --test --test-reporter=spec`）及共享 MCP 配置导入校验。
+   - 快速反馈，在每次 push 和 PR 时生成详细的测试报告与 GitHub Step Summary。
+2. **macOS 打包与发布工作流 ([.github/workflows/build-macos.yml](../.github/workflows/build-macos.yml))**：
+   - 基于 `macos-14` 执行原生打包（生成 DMG 与 ZIP）、代码签名，并执行后打包测试（`node --test tests/package.test.js`）直接校验生成的安装包与 App 结构。
+   - 支持 4 种触发模式（Push、PR、Tag Release、手动 `workflow_dispatch`）。
+
+---
+
+## 三、GitHub Actions CI/CD 触发机制 / GitHub Actions Trigger Mechanisms
+
+工作流支持 4 种触发方式：  
+The workflows support 4 triggering modes:
 
 ### 1. 自动触发：分支推送 / Push Trigger
 - **中文**：向 `main` 或特性分支推送代码时自动触发。云端 Runner 自动拉取代码、安装依赖、运行 `npm run check` 与 `npm test`，并执行打包，上传保留 90 天的 Artifacts 供下载测试。

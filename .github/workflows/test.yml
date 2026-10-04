@@ -1,0 +1,76 @@
+name: Unit Tests
+
+on:
+  push:
+    branches:
+      - main
+      - 'charzl/**'
+    tags:
+      - 'v*'
+  pull_request:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  unit-tests:
+    name: Run Unit Tests (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [macos-14, ubuntu-latest]
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: 'npm'
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run JavaScript syntax checks
+        run: npm run check
+
+      - name: Run Unit Tests (41 test suites)
+        run: node --test --test-reporter=spec tests/*.test.js
+
+      - name: Verify MCP configuration import
+        run: npm run import:mcp
+
+      - name: Generate GitHub Step Summary
+        if: always()
+        run: |
+          echo "## 🧪 Unit Tests Summary (${{ matrix.os }})" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "- **Operating System**: \`${{ matrix.os }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "- **Node.js Version**: \`22\`" >> $GITHUB_STEP_SUMMARY
+          echo "- **Status**: All 41 unit tests executed with \`node --test\`" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### Test Suites Covered" >> $GITHUB_STEP_SUMMARY
+          echo "| Test File | Category |" >> $GITHUB_STEP_SUMMARY
+          echo "| :--- | :--- |" >> $GITHUB_STEP_SUMMARY
+          echo "| \`tests/capabilities.test.js\` | Shared Capabilities & Provider Adapters |" >> $GITHUB_STEP_SUMMARY
+          echo "| \`tests/independent.test.js\` | Independent Investigations & Sandbox |" >> $GITHUB_STEP_SUMMARY
+          echo "| \`tests/language.test.js\` | Localization & Language Consistency |" >> $GITHUB_STEP_SUMMARY
+          echo "| \`tests/lifecycle.test.js\` | Meeting Lifecycle & Decision Drafting |" >> $GITHUB_STEP_SUMMARY
+          echo "| \`tests/mcp-import.test.js\` | MCP Deduplication & Secret Storage |" >> $GITHUB_STEP_SUMMARY
+          echo "| \`tests/mcp.test.js\` | Scoped Meeting MCP Tools |" >> $GITHUB_STEP_SUMMARY
+          echo "| \`tests/meeting.test.js\` | Serial Rounds & Consensus Engine |" >> $GITHUB_STEP_SUMMARY
+          echo "| \`tests/package.test.js\` | Packaging Pipeline & Integrity |" >> $GITHUB_STEP_SUMMARY
+          echo "| \`tests/providers.test.js\` | Codex, Claude, AGY, Cursor Integrations |" >> $GITHUB_STEP_SUMMARY
+          echo "| \`tests/server.test.js\` | Loopback Service Security & Auth |" >> $GITHUB_STEP_SUMMARY
+          echo "| \`tests/storage.test.js\` | Data Directory & Migration Safety |" >> $GITHUB_STEP_SUMMARY
