@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Packaging script for Roundtable PySide6 macOS App using PyInstaller.
+Packaging script for Roundtable PySide6 Desktop App (macOS & Linux/Ubuntu).
 """
 
 import os
@@ -24,17 +24,19 @@ def package():
     build_dir = base_dir / "build"
     app_name = "Roundtable-PySide6"
     version = "0.2.2"
+    is_macos = (sys.platform == "darwin")
+    is_linux = sys.platform.startswith("linux")
 
-    # Clean previous
+    # Clean previous builds
     if dist_dir.exists():
         shutil.rmtree(dist_dir)
     if build_dir.exists():
         shutil.rmtree(build_dir)
 
-    print(f"📦 [PySide6] 开始构建 macOS 原生应用包 / Starting PyInstaller build: {app_name}...")
+    target_os_name = "macOS" if is_macos else ("Linux / Ubuntu" if is_linux else sys.platform)
+    print(f"📦 [PySide6] 开始构建 {target_os_name} 原生应用包 / Starting build for {target_os_name}...")
     start_time = time.time()
 
-    # Locate pyinstaller
     pyinstaller_bin = shutil.which("pyinstaller")
     if not pyinstaller_bin:
         venv_bin = base_dir / ".venv" / "bin" / "pyinstaller"
@@ -58,9 +60,14 @@ def package():
         "--exclude-module", "numpy",
     ]
 
-    icon_file = base_dir / "resources" / "AppIcon.icns"
-    if icon_file.exists():
-        cmd.extend(["--icon", "resources/AppIcon.icns"])
+    if is_macos:
+        icon_file = base_dir / "resources" / "AppIcon.icns"
+        if icon_file.exists():
+            cmd.extend(["--icon", str(icon_file)])
+    else:
+        icon_png = base_dir / "resources" / "icon.png"
+        if icon_png.exists():
+            cmd.extend(["--icon", str(icon_png)])
 
     cmd.append("main.py")
 
@@ -71,41 +78,65 @@ def package():
         sys.exit(res.returncode)
 
     elapsed = time.time() - start_time
-    app_path = dist_dir / f"{app_name}.app"
-    
-    if not app_path.exists():
-        print(f"❌ 找不到生成的应用包 / App not found at: {app_path}")
-        sys.exit(1)
 
-    # Compute uncompressed size
-    size_res = subprocess.run(["du", "-sk", str(app_path)], capture_output=True, text=True)
-    app_size_kb = int(size_res.stdout.split()[0])
-    app_size_mb = app_size_kb / 1024.0
+    if is_macos:
+        app_path = dist_dir / f"{app_name}.app"
+        if not app_path.exists():
+            print(f"❌ 找不到生成的应用包 / App not found at: {app_path}")
+            sys.exit(1)
 
-    # Create ZIP archives
-    zip_versioned = dist_dir / f"{app_name}-{version}-mac-arm64.zip"
-    zip_generic = dist_dir / f"{app_name}-mac-arm64.zip"
-    subprocess.run(["ditto", "-c", "-k", "--keepParent", str(app_path), str(zip_versioned)], check=True)
-    shutil.copy2(zip_versioned, zip_generic)
+        size_res = subprocess.run(["du", "-sk", str(app_path)], capture_output=True, text=True)
+        app_size_kb = int(size_res.stdout.split()[0])
+        app_size_mb = app_size_kb / 1024.0
 
-    zip_size_mb = zip_versioned.stat().st_size / (1024.0 * 1024.0)
+        zip_versioned = dist_dir / f"{app_name}-{version}-mac-arm64.zip"
+        zip_generic = dist_dir / f"{app_name}-mac-arm64.zip"
+        subprocess.run(["ditto", "-c", "-k", "--keepParent", str(app_path), str(zip_versioned)], check=True)
+        shutil.copy2(zip_versioned, zip_generic)
 
-    # Checksums
-    sha256 = compute_sha256(zip_versioned)
-    sha_file = dist_dir / f"{app_name}-{version}-mac-arm64.sha256"
-    with open(sha_file, "w") as f:
-        f.write(f"{sha256}  {zip_versioned.name}\n")
+        zip_size_mb = zip_versioned.stat().st_size / (1024.0 * 1024.0)
+        sha256 = compute_sha256(zip_versioned)
+        sha_file = dist_dir / f"{app_name}-{version}-mac-arm64.sha256"
+        with open(sha_file, "w") as f:
+            f.write(f"{sha256}  {zip_versioned.name}\n")
 
-    print(f"✅ [PySide6] 构建完成 / Build completed in {elapsed:.2f}s!")
-    print(f"   - App Bundle: {app_path} ({app_size_mb:.2f} MB)")
-    print(f"   - Distribution ZIP: {zip_versioned} ({zip_size_mb:.2f} MB)")
-    print(f"   - SHA256: {sha256}")
+        print(f"✅ [PySide6] macOS 构建完成 / Completed in {elapsed:.2f}s!")
+        print(f"   - App Bundle: {app_path} ({app_size_mb:.2f} MB)")
+        print(f"   - Distribution ZIP: {zip_versioned} ({zip_size_mb:.2f} MB)")
+        print(f"   - SHA256: {sha256}")
+        archive_path = zip_versioned
+
+    else:
+        # Linux (Ubuntu) packaging: standalone folder to .tar.gz
+        bundle_dir = dist_dir / app_name
+        if not bundle_dir.exists():
+            print(f"❌ 找不到生成的 Linux 分发目录 / Bundle not found at: {bundle_dir}")
+            sys.exit(1)
+
+        size_res = subprocess.run(["du", "-sk", str(bundle_dir)], capture_output=True, text=True)
+        app_size_kb = int(size_res.stdout.split()[0])
+        app_size_mb = app_size_kb / 1024.0
+
+        tar_versioned = dist_dir / f"{app_name}-{version}-linux-x64.tar.gz"
+        tar_generic = dist_dir / f"{app_name}-linux-x64.tar.gz"
+        subprocess.run(["tar", "-czf", str(tar_versioned), "-C", str(dist_dir), app_name], check=True)
+        shutil.copy2(tar_versioned, tar_generic)
+
+        tar_size_mb = tar_versioned.stat().st_size / (1024.0 * 1024.0)
+        sha256 = compute_sha256(tar_versioned)
+        sha_file = dist_dir / f"{app_name}-{version}-linux-x64.sha256"
+        with open(sha_file, "w") as f:
+            f.write(f"{sha256}  {tar_versioned.name}\n")
+
+        print(f"✅ [PySide6] Linux/Ubuntu 构建完成 / Completed in {elapsed:.2f}s!")
+        print(f"   - Distribution Folder: {bundle_dir} ({app_size_mb:.2f} MB)")
+        print(f"   - Distribution Archive: {tar_versioned} ({tar_size_mb:.2f} MB)")
+        print(f"   - SHA256: {sha256}")
+        archive_path = tar_versioned
 
     return {
-        'app_path': str(app_path),
-        'zip_path': str(zip_versioned),
-        'app_size_mb': app_size_mb,
-        'zip_size_mb': zip_size_mb,
+        'dist_path': str(archive_path),
+        'size_mb': archive_path.stat().st_size / (1024.0 * 1024.0),
         'sha256': sha256,
         'build_time_s': elapsed
     }
