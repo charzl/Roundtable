@@ -58,6 +58,19 @@ def package():
         "--exclude-module", "matplotlib",
         "--exclude-module", "scipy",
         "--exclude-module", "numpy",
+        "--exclude-module", "PySide6.QtNetwork",
+        "--exclude-module", "PySide6.QtQml",
+        "--exclude-module", "PySide6.QtQuick",
+        "--exclude-module", "PySide6.QtQuickWidgets",
+        "--exclude-module", "PySide6.QtSql",
+        "--exclude-module", "PySide6.QtPdf",
+        "--exclude-module", "PySide6.QtPdfWidgets",
+        "--exclude-module", "PySide6.QtSvg",
+        "--exclude-module", "PySide6.QtOpenGL",
+        "--exclude-module", "PySide6.QtOpenGLWidgets",
+        "--exclude-module", "PySide6.QtTest",
+        "--exclude-module", "PySide6.QtPrintSupport",
+        "--exclude-module", "PySide6.QtXml",
     ]
 
     if is_macos:
@@ -90,9 +103,7 @@ def package():
         app_size_mb = app_size_kb / 1024.0
 
         zip_versioned = dist_dir / f"{app_name}-{version}-mac-arm64.zip"
-        zip_generic = dist_dir / f"{app_name}-mac-arm64.zip"
         subprocess.run(["ditto", "-c", "-k", "--keepParent", str(app_path), str(zip_versioned)], check=True)
-        shutil.copy2(zip_versioned, zip_generic)
 
         zip_size_mb = zip_versioned.stat().st_size / (1024.0 * 1024.0)
         sha256 = compute_sha256(zip_versioned)
@@ -118,9 +129,7 @@ def package():
         app_size_mb = app_size_kb / 1024.0
 
         tar_versioned = dist_dir / f"{app_name}-{version}-linux-x64.tar.gz"
-        tar_generic = dist_dir / f"{app_name}-linux-x64.tar.gz"
         subprocess.run(["tar", "-czf", str(tar_versioned), "-C", str(dist_dir), app_name], check=True)
-        shutil.copy2(tar_versioned, tar_generic)
 
         tar_size_mb = tar_versioned.stat().st_size / (1024.0 * 1024.0)
         sha256 = compute_sha256(tar_versioned)

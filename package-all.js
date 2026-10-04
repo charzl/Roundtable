@@ -67,22 +67,26 @@ try {
   results.push({ stack: 'Python (PySide6)', status: 'failed', error: e.message });
 }
 
-// 3. Package JavaScript / Electron (Deprecated Reference)
-console.log('\n📦 [3/3] 打包 JavaScript / Electron 客户端 (已废弃供参考 / Deprecated Reference)...');
-try {
-  execSync('npm --prefix javascript-deprecated run package:mac', { stdio: 'inherit', cwd: root });
-  const jsDist = existsSync(join(root, 'javascript-deprecated/dist')) ? join(root, 'javascript-deprecated/dist') : rootDist;
-  for (const f of readdirSync(jsDist)) {
-    if (f.startsWith('Roundtable-') && !f.includes('PySide') && !f.includes('Swift')) {
-      const src = join(jsDist, f);
-      const dest = join(rootDist, f);
-      if (src !== dest && statSync(src).isFile()) cpSync(src, dest);
+// 3. Package JavaScript / Electron (Deprecated Reference - Only if explicitly requested)
+if (process.env.PACKAGE_DEPRECATED_JS === 'true') {
+  console.log('\n📦 [3/3] 打包 JavaScript / Electron 客户端 (已废弃供参考 / Deprecated Reference)...');
+  try {
+    execSync('npm --prefix javascript-deprecated run package:mac', { stdio: 'inherit', cwd: root });
+    const jsDist = existsSync(join(root, 'javascript-deprecated/dist')) ? join(root, 'javascript-deprecated/dist') : rootDist;
+    for (const f of readdirSync(jsDist)) {
+      if (f.startsWith('Roundtable-') && !f.includes('PySide') && !f.includes('Swift')) {
+        const src = join(jsDist, f);
+        const dest = join(rootDist, f);
+        if (src !== dest && statSync(src).isFile()) cpSync(src, dest);
+      }
     }
+    results.push({ stack: 'JavaScript (Electron, Deprecated)', status: 'success' });
+  } catch (e) {
+    console.error('⚠️ JavaScript 打包出错:', e.message);
+    results.push({ stack: 'JavaScript (Electron, Deprecated)', status: 'failed', error: e.message });
   }
-  results.push({ stack: 'JavaScript (Electron, Deprecated)', status: 'success' });
-} catch (e) {
-  console.error('⚠️ JavaScript 打包出错:', e.message);
-  results.push({ stack: 'JavaScript (Electron, Deprecated)', status: 'failed', error: e.message });
+} else {
+  console.log('\n📦 [3/3] 跳过已废弃的 JavaScript / Electron 客户端打包 (保留代码供参考，可设 PACKAGE_DEPRECATED_JS=true 开启)...');
 }
 
 // 4. Consolidate Checksums & Manifest
