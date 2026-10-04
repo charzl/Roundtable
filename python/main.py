@@ -19,9 +19,12 @@ def main():
     app.setApplicationName("Roundtable")
     app.setOrganizationName("Roundtable")
 
-    icon_path = Path(__file__).resolve().parent / "resources" / "icon.png"
+    base_path = Path(getattr(sys, '_MEIPASS', Path(__file__).resolve().parent))
+    icon_path = base_path / "resources" / "icon.png"
     if not icon_path.exists():
-        icon_path = Path(__file__).resolve().parent / "resources" / "AppIcon.icns"
+        icon_path = base_path / "resources" / "icon.ico"
+    if not icon_path.exists():
+        icon_path = base_path / "resources" / "AppIcon.icns"
     if icon_path.exists():
         app.setWindowIcon(QIcon(str(icon_path)))
 

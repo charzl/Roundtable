@@ -69,10 +69,8 @@ APP_SIZE_KB=$(du -sk "$APP_DIR" | awk '{print $1}')
 APP_SIZE_MB=$(echo "scale=2; $APP_SIZE_KB / 1024" | bc)
 
 ZIP_VERSIONED="$DIST_DIR/$APP_NAME-$VERSION-mac-arm64.zip"
-ZIP_GENERIC="$DIST_DIR/$APP_NAME-mac-arm64.zip"
 
 ditto -c -k --keepParent "$APP_DIR" "$ZIP_VERSIONED"
-cp "$ZIP_VERSIONED" "$ZIP_GENERIC"
 
 ZIP_SIZE_BYTES=$(stat -f%z "$ZIP_VERSIONED")
 ZIP_SIZE_MB=$(echo "scale=2; $ZIP_SIZE_BYTES / 1048576" | bc)

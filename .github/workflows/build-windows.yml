@@ -1,4 +1,4 @@
-name: Build Ubuntu Packages
+name: Build Windows Packages
 
 on:
   push:
@@ -22,9 +22,12 @@ permissions:
   contents: write
 
 jobs:
-  build-ubuntu-x64:
-    name: Build Ubuntu x64 (Python & PySide6)
-    runs-on: ubuntu-latest
+  build-windows-x64:
+    name: Build Windows x64 (Python & PySide6)
+    runs-on: windows-latest
+    env:
+      PYTHONUTF8: '1'
+      PYTHONIOENCODING: 'utf-8'
 
     steps:
       - name: Check out repository
@@ -37,64 +40,61 @@ jobs:
           cache: 'pip'
           cache-dependency-path: 'python/requirements.txt'
 
-      - name: Install system dependencies for Qt 6 / PySide6
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y --no-install-recommends \
-            libegl1 \
-            libgl1-mesa-dev \
-            libxkbcommon-x11-0 \
-            libdbus-1-3
-
       - name: Install Python dependencies
-        run: pip install -r python/requirements.txt
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r python/requirements.txt
 
       - name: Run Python Unit Tests
-        run: python3 -m unittest discover -s python/tests -p "test_*.py" -v
+        run: python -m unittest discover -s python/tests -p "test_*.py" -v
 
-      - name: "Package Python Native for Linux / Ubuntu"
-        run: python3 python/package.py
+      - name: "Package Python Native for Windows"
+        run: python python/package.py
 
       - name: Verify package artifacts
+        shell: bash
         run: |
           ls -lh python/dist/
           cat python/dist/*.sha256
 
       - name: Generate GitHub Step Summary
         if: always()
+        shell: bash
         run: |
-          echo "## 🐧 Linux / Ubuntu Application Packaging Summary" >> $GITHUB_STEP_SUMMARY
+          echo "## 🪟 Windows x64 Application Packaging Summary" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
-          echo "### 🌟 主力 Linux 原生客户端 / Primary Linux Production Stack" >> $GITHUB_STEP_SUMMARY
-          echo "- **Python Native (PySide6 / Qt 6)**: 跨平台便携独立分发包 (~27 MB)，完整适配 X11 与 Wayland" >> $GITHUB_STEP_SUMMARY
+          echo "### 🌟 主力 Windows 原生独立客户端 / Primary Windows Production Stack" >> $GITHUB_STEP_SUMMARY
+          echo "- **Python Native (PySide6 / Qt 6)**: 跨平台便携独立绿色包 (~28 MB)，无需安装 Python，解压即用" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "### 📦 已生成分发产物列表 / Generated Distribution Artifacts" >> $GITHUB_STEP_SUMMARY
           echo "| 产物类型 | 文件名 | SHA256 (Prefix) |" >> $GITHUB_STEP_SUMMARY
           echo "| :--- | :--- | :--- |" >> $GITHUB_STEP_SUMMARY
-          awk '{print "| Linux 软件包 | `" $2 "` | `" substr($1,1,12) "...` |"}' python/dist/*.sha256 >> $GITHUB_STEP_SUMMARY
+          if ls python/dist/*.sha256 1> /dev/null 2>&1; then
+            awk '{print "| Windows 软件包 | `" $2 "` | `" substr($1,1,12) "...` |"}' python/dist/*.sha256 >> $GITHUB_STEP_SUMMARY
+          fi
 
-      - name: Upload Linux Ubuntu artifacts
+      - name: Upload Windows artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: Roundtable-Linux-Ubuntu-x64-Packages
+          name: Roundtable-Windows-x64-Packages
           path: |
-            python/dist/Roundtable-PySide6-*.tar.gz
+            python/dist/Roundtable-PySide6-*.zip
             python/dist/Roundtable-PySide6-*.sha256
           if-no-files-found: error
 
   release:
     name: Publish GitHub Release
-    needs: [build-ubuntu-x64]
+    needs: [build-windows-x64]
     if: startsWith(github.ref, 'refs/tags/v') || (github.event_name == 'workflow_dispatch' && inputs.create_release == true)
     runs-on: ubuntu-latest
     steps:
       - name: Check out repository
         uses: actions/checkout@v4
 
-      - name: Download Linux packages
+      - name: Download Windows packages
         uses: actions/download-artifact@v4
         with:
-          name: Roundtable-Linux-Ubuntu-x64-Packages
+          name: Roundtable-Windows-x64-Packages
           path: release-packages
 
       - name: Display downloaded packages
