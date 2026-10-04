@@ -8,13 +8,22 @@ import sys
 import subprocess
 import shutil
 import time
+import hashlib
 from pathlib import Path
+
+def compute_sha256(path: Path) -> str:
+    h = hashlib.sha256()
+    with open(path, "rb") as f:
+        while chunk := f.read(65536):
+            h.update(chunk)
+    return h.hexdigest()
 
 def package():
     base_dir = Path(__file__).resolve().parent
     dist_dir = base_dir / "dist"
     build_dir = base_dir / "build"
     app_name = "Roundtable-PySide6"
+    version = "0.2.2"
 
     # Clean previous
     if dist_dir.exists():
@@ -25,15 +34,24 @@ def package():
     print(f"📦 [PySide6] 开始构建 macOS 原生应用包 / Starting PyInstaller build: {app_name}...")
     start_time = time.time()
 
+    # Locate pyinstaller
+    pyinstaller_bin = shutil.which("pyinstaller")
+    if not pyinstaller_bin:
+        venv_bin = base_dir / ".venv" / "bin" / "pyinstaller"
+        if venv_bin.exists():
+            pyinstaller_bin = str(venv_bin)
+        else:
+            pyinstaller_bin = "pyinstaller"
+
     cmd = [
-        str(base_dir / ".venv" / "bin" / "pyinstaller"),
+        pyinstaller_bin,
         "--noconfirm",
         "--windowed",
         "--name", app_name,
         "--distpath", str(dist_dir),
         "--workpath", str(build_dir),
         "--specpath", str(base_dir),
-        # Optimize size: exclude unused Qt modules and heavy packages
+        # Optimize size: exclude unused heavy modules
         "--exclude-module", "tkinter",
         "--exclude-module", "matplotlib",
         "--exclude-module", "scipy",
@@ -59,20 +77,31 @@ def package():
     app_size_kb = int(size_res.stdout.split()[0])
     app_size_mb = app_size_kb / 1024.0
 
-    # Create ZIP archive to measure compressed distribution size
-    zip_path = dist_dir / f"{app_name}-mac-arm64.zip"
-    subprocess.run(["ditto", "-c", "-k", "--keepParent", str(app_path), str(zip_path)], check=True)
-    zip_size_mb = zip_path.stat().st_size / (1024.0 * 1024.0)
+    # Create ZIP archives
+    zip_versioned = dist_dir / f"{app_name}-{version}-mac-arm64.zip"
+    zip_generic = dist_dir / f"{app_name}-mac-arm64.zip"
+    subprocess.run(["ditto", "-c", "-k", "--keepParent", str(app_path), str(zip_versioned)], check=True)
+    shutil.copy2(zip_versioned, zip_generic)
+
+    zip_size_mb = zip_versioned.stat().st_size / (1024.0 * 1024.0)
+
+    # Checksums
+    sha256 = compute_sha256(zip_versioned)
+    sha_file = dist_dir / f"{app_name}-{version}-mac-arm64.sha256"
+    with open(sha_file, "w") as f:
+        f.write(f"{sha256}  {zip_versioned.name}\n")
 
     print(f"✅ [PySide6] 构建完成 / Build completed in {elapsed:.2f}s!")
     print(f"   - App Bundle: {app_path} ({app_size_mb:.2f} MB)")
-    print(f"   - Distribution ZIP: {zip_path} ({zip_size_mb:.2f} MB)")
+    print(f"   - Distribution ZIP: {zip_versioned} ({zip_size_mb:.2f} MB)")
+    print(f"   - SHA256: {sha256}")
 
     return {
         'app_path': str(app_path),
-        'zip_path': str(zip_path),
+        'zip_path': str(zip_versioned),
         'app_size_mb': app_size_mb,
         'zip_size_mb': zip_size_mb,
+        'sha256': sha256,
         'build_time_s': elapsed
     }
 
