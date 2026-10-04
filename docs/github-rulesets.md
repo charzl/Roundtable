@@ -48,3 +48,14 @@ This document explains the GitHub Rulesets configured for the Roundtable reposit
 3. **允许新建标签 / Allow creation**:
    - 中文：开发者和 CI 可以正常推送新的 `v*` 标签以触发自动发布工作流。
    - English: Developers and automated workflows can freely push new `v*` tags to trigger release pipelines.
+
+---
+
+## 三、自动清理分支设置 / Automatically Delete Head Branches on Merge
+
+- **配置项 / Setting**：`delete_branch_on_merge: true`
+- **生效状态 / Enforcement**：`active`（已激活 / Active）
+- **说明 / Description**：
+  - 中文：当 Pull Request 合并进入主分支（`main`）后，GitHub 会自动删除已合并的源功能分支（Head branch），避免远程积累陈旧分支，保持分支树整洁。
+  - English: Once a Pull Request is successfully merged into `main`, GitHub automatically deletes the head branch, keeping the remote repository clean from stale feature branches.
+
