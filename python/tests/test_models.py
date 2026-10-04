@@ -68,5 +68,14 @@ class TestModels(unittest.TestCase):
         self.assertIn("M-1", ids)
         self.assertIn("M-2", ids)
 
+    def test_claim_and_decision_models(self):
+        c = Claim(id="C-1", text="Swift 性能最优", kind="proposal", sources=["benchmark.py"], limitations="macOS only")
+        self.assertEqual(c.id, "C-1")
+        self.assertEqual(c.limitations, "macOS only")
+
+        d = Decision(author="codex", recommendation="推荐采用 Python 与 Swift 架构", disagreements=["Electron 废弃时机"])
+        self.assertEqual(d.author, "codex")
+        self.assertIn("Electron 废弃时机", d.disagreements)
+
 if __name__ == '__main__':
     unittest.main()
