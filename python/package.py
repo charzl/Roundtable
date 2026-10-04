@@ -11,6 +11,14 @@ import time
 import hashlib
 from pathlib import Path
 
+# Ensure UTF-8 console output on Windows runners
+if sys.stdout and hasattr(sys.stdout, "reconfigure"):
+    try:
+        sys.stdout.reconfigure(encoding="utf-8")
+        sys.stderr.reconfigure(encoding="utf-8")
+    except Exception:
+        pass
+
 def compute_sha256(path: Path) -> str:
     h = hashlib.sha256()
     with open(path, "rb") as f:

@@ -25,6 +25,9 @@ jobs:
   build-windows-x64:
     name: Build Windows x64 (Python & PySide6)
     runs-on: windows-latest
+    env:
+      PYTHONUTF8: '1'
+      PYTHONIOENCODING: 'utf-8'
 
     steps:
       - name: Check out repository
@@ -66,7 +69,9 @@ jobs:
           echo "### 📦 已生成分发产物列表 / Generated Distribution Artifacts" >> $GITHUB_STEP_SUMMARY
           echo "| 产物类型 | 文件名 | SHA256 (Prefix) |" >> $GITHUB_STEP_SUMMARY
           echo "| :--- | :--- | :--- |" >> $GITHUB_STEP_SUMMARY
-          awk '{print "| Windows 软件包 | `" $2 "` | `" substr($1,1,12) "...` |"}' python/dist/*.sha256 >> $GITHUB_STEP_SUMMARY
+          if ls python/dist/*.sha256 1> /dev/null 2>&1; then
+            awk '{print "| Windows 软件包 | `" $2 "` | `" substr($1,1,12) "...` |"}' python/dist/*.sha256 >> $GITHUB_STEP_SUMMARY
+          fi
 
       - name: Upload Windows artifacts
         uses: actions/upload-artifact@v4
