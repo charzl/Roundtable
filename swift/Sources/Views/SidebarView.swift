@@ -6,48 +6,146 @@ public struct SidebarView: View {
     let onNewMeeting: () -> Void
 
     public var body: some View {
-        List(selection: $selectedMeetingId) {
-            Section(header: Text("历史会议 / Meetings")) {
-                ForEach(store.meetings) { meeting in
-                    NavigationLink(value: meeting.id) {
-                        VStack(alignment: .leading, spacing: 4) {
-                            Text(meeting.topic)
-                                .font(.headline)
-                                .lineLimit(1)
+        VStack(alignment: .leading, spacing: 0) {
+            // Meeting Records Section
+            Text("会议记录")
+                .font(.system(size: 14, weight: .bold))
+                .foregroundColor(.rtInk)
+                .padding(.horizontal, 16)
+                .padding(.top, 16)
+                .padding(.bottom, 8)
 
-                            HStack(spacing: 6) {
-                                Text(meeting.status.uppercased())
-                                    .font(.caption2)
-                                    .fontWeight(.bold)
-                                    .padding(.horizontal, 4)
-                                    .padding(.vertical, 1)
-                                    .background(meeting.status == "completed" ? Color.green.opacity(0.15) : Color.blue.opacity(0.15))
-                                    .foregroundColor(meeting.status == "completed" ? .green : .blue)
-                                    .cornerRadius(3)
+            ScrollView {
+                LazyVStack(spacing: 4) {
+                    ForEach(store.meetings) { meeting in
+                        let isSelected = selectedMeetingId == meeting.id
+                        Button(action: {
+                            selectedMeetingId = meeting.id
+                        }) {
+                            VStack(alignment: .leading, spacing: 4) {
+                                Text(meeting.topic)
+                                    .font(.system(size: 13, weight: isSelected ? .semibold : .medium))
+                                    .foregroundColor(.rtInk)
+                                    .lineLimit(1)
 
-                                Text("R\(meeting.round)")
-                                    .font(.caption2)
-                                    .foregroundColor(.secondary)
+                                HStack(spacing: 6) {
+                                    Text(meeting.status == "completed" ? "已完成" : "进行中")
+                                        .font(.system(size: 11))
+                                        .foregroundColor(.rtMuted)
 
-                                Spacer()
+                                    Text("·")
+                                        .foregroundColor(.rtMuted)
 
-                                Text("\(meeting.messages.count) 发言")
-                                    .font(.caption2)
-                                    .foregroundColor(.secondary)
+                                    Text("R\(meeting.round)")
+                                        .font(.system(size: 11))
+                                        .foregroundColor(.rtMuted)
+
+                                    Spacer()
+
+                                    Text("\(meeting.messages.count) 发言")
+                                        .font(.system(size: 11))
+                                        .foregroundColor(.rtMuted)
+                                }
                             }
+                            .padding(.horizontal, 12)
+                            .padding(.vertical, 8)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .background(isSelected ? Color.rtSoft : Color.clear)
+                            .cornerRadius(8)
                         }
-                        .padding(.vertical, 4)
+                        .buttonStyle(.plain)
+                        .padding(.horizontal, 10)
                     }
                 }
             }
-        }
-        .listStyle(.sidebar)
-        .toolbar {
-            ToolbarItem(placement: .primaryAction) {
-                Button(action: onNewMeeting) {
-                    Label("新建会议", systemImage: "plus")
+
+            // Divider Note
+            VStack(alignment: .leading, spacing: 6) {
+                Divider()
+                    .foregroundColor(.rtLine)
+                Text("一次一位公开发言 · 最多 10 轮 · 决定由你做出")
+                    .font(.system(size: 11))
+                    .foregroundColor(.rtMuted)
+                    .lineSpacing(3)
+                    .padding(.horizontal, 16)
+                    .padding(.vertical, 6)
+            }
+
+            // Participants Section
+            VStack(alignment: .leading, spacing: 8) {
+                Text("参会者")
+                    .font(.system(size: 14, weight: .bold))
+                    .foregroundColor(.rtInk)
+                    .padding(.horizontal, 16)
+
+                // Human
+                HStack(spacing: 10) {
+                    Circle()
+                        .stroke(Color.rtAccent, lineWidth: 1)
+                        .background(Circle().fill(Color.rtSoft))
+                        .frame(width: 28, height: 28)
+                        .overlay(
+                            Text("你")
+                                .font(.system(size: 11, weight: .bold))
+                                .foregroundColor(.rtAccent)
+                        )
+
+                    VStack(alignment: .leading, spacing: 1) {
+                        Text("你")
+                            .font(.system(size: 12, weight: .semibold))
+                            .foregroundColor(.rtInk)
+                        Text("会议发起人")
+                            .font(.system(size: 10))
+                            .foregroundColor(.rtMuted)
+                    }
+                }
+                .padding(.horizontal, 16)
+
+                // Selected meeting AI participants or default participants
+                let activeParticipants = currentParticipants()
+                ForEach(activeParticipants, id: \.self) { p in
+                    let info = knownParticipants[p]
+                    HStack(spacing: 10) {
+                        Circle()
+                            .stroke(Color.rtLine, lineWidth: 1)
+                            .background(Circle().fill(Color.white))
+                            .frame(width: 28, height: 28)
+                            .overlay(
+                                Text(String((info?.name ?? p).prefix(2)))
+                                    .font(.system(size: 11, weight: .medium))
+                                    .foregroundColor(.rtInk)
+                            )
+
+                        VStack(alignment: .leading, spacing: 1) {
+                            Text(info?.name ?? p)
+                                .font(.system(size: 12, weight: .semibold))
+                                .foregroundColor(.rtInk)
+                            Text(isLeader(p) ? "Leader · 会议负责人" : "等待发言")
+                                .font(.system(size: 10))
+                                .foregroundColor(.rtMuted)
+                        }
+                    }
+                    .padding(.horizontal, 16)
                 }
             }
+            .padding(.bottom, 16)
         }
+        .frame(minWidth: 220, maxWidth: 260)
+        .background(Color.rtPanel)
+        .overlay(Rectangle().frame(width: 1).foregroundColor(.rtLine), alignment: .trailing)
+    }
+
+    private func currentParticipants() -> [String] {
+        if let id = selectedMeetingId, let m = store.meetings.first(where: { $0.id == id }) {
+            return m.participants
+        }
+        return ["codex", "claude", "agy", "cursor"]
+    }
+
+    private func isLeader(_ id: String) -> Bool {
+        if let mId = selectedMeetingId, let m = store.meetings.first(where: { $0.id == mId }) {
+            return m.leader == id
+        }
+        return id == "codex"
     }
 }

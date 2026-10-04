@@ -23,6 +23,9 @@ fi
 rm -rf "$DIST_DIR"
 mkdir -p "$APP_DIR/Contents/MacOS"
 mkdir -p "$APP_DIR/Contents/Resources"
+if [ -f "$BASE_DIR/Resources/AppIcon.icns" ]; then
+    cp "$BASE_DIR/Resources/AppIcon.icns" "$APP_DIR/Contents/Resources/AppIcon.icns"
+fi
 
 cp "$BIN_PATH" "$APP_DIR/Contents/MacOS/RoundtableSwift"
 chmod +x "$APP_DIR/Contents/MacOS/RoundtableSwift"
@@ -40,6 +43,8 @@ cat <<EOF > "$APP_DIR/Contents/Info.plist"
     <string>Roundtable</string>
     <key>CFBundleDisplayName</key>
     <string>Roundtable (Swift)</string>
+    <key>CFBundleIconFile</key>
+    <string>AppIcon</string>
     <key>CFBundlePackageType</key>
     <string>APPL</string>
     <key>CFBundleShortVersionString</key>

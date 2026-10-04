@@ -35,7 +35,7 @@ jobs:
         with:
           node-version: 22
           cache: 'npm'
-          cache-dependency-path: 'javascript/package-lock.json'
+          cache-dependency-path: 'javascript-deprecated/package-lock.json'
 
       - name: Set up Python 3.11
         uses: actions/setup-python@v5
@@ -46,7 +46,7 @@ jobs:
 
       - name: Install dependencies (JavaScript & Python)
         run: |
-          npm --prefix javascript ci
+          npm --prefix javascript-deprecated ci
           pip install -r python/requirements.txt
 
       - name: Run syntax checks
@@ -63,7 +63,7 @@ jobs:
         run: node package-all.js
 
       - name: Run post-packaging verification tests
-        run: npm --prefix javascript test javascript/tests/package.test.js
+        run: npm --prefix javascript-deprecated test javascript-deprecated/tests/package.test.js
 
       - name: Verify package artifacts
         run: |

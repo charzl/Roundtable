@@ -56,8 +56,13 @@ def package():
         "--exclude-module", "matplotlib",
         "--exclude-module", "scipy",
         "--exclude-module", "numpy",
-        str(base_dir / "main.py")
     ]
+
+    icon_file = base_dir / "resources" / "AppIcon.icns"
+    if icon_file.exists():
+        cmd.extend(["--icon", "resources/AppIcon.icns"])
+
+    cmd.append("main.py")
 
     res = subprocess.run(cmd, cwd=str(base_dir), capture_output=True, text=True)
     if res.returncode != 0:

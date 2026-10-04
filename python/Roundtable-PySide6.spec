@@ -32,6 +32,7 @@ exe = EXE(
     target_arch=None,
     codesign_identity=None,
     entitlements_file=None,
+    icon=['resources/AppIcon.icns'],
 )
 coll = COLLECT(
     exe,
@@ -45,6 +46,6 @@ coll = COLLECT(
 app = BUNDLE(
     coll,
     name='Roundtable-PySide6.app',
-    icon=None,
+    icon='resources/AppIcon.icns',
     bundle_identifier=None,
 )

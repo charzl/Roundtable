@@ -1,6 +1,11 @@
-# Roundtable (圆桌会议) - JavaScript / Electron 桌面客户端
+# Roundtable (圆桌会议) - JavaScript / Electron 客户端 (已废弃 / Deprecated)
 
-基于 **Node.js 22** 与 **Electron** 构建的跨平台多 Agent 会议客户端与本地服务守护进程。
+> [!WARNING]
+> **此 JavaScript / Electron 实现已废弃并归档供后续参考 (Deprecated for reference only)。**
+> 
+> - **废弃原因**：打包体积较大（约 123MB ~ 307MB）且多进程运行时物理内存占用高（约 156MB+）。
+> - **后续主力开发**：聚焦于轻量高性能的 [Python (PySide6)](../python/README.md)（约 27MB）与 [Swift Native (SwiftUI/AppKit)](../swift/README.md)（约 0.48MB）。
+> - **保留价值**：本目录完好保留了 41 项完备的单元测试、协议解析逻辑、MCP 配置文件导入器与 UI 样式设计规范，供 Python 与 Swift 版本参考与移植。
 
 ---
 
