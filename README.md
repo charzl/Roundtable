@@ -23,13 +23,15 @@ npm start
 npm run build:mac
 open dist/Roundtable.app
 
-# 生成完整分发包（DMG 与 ZIP，附带 SHA256 校验和）
+# 生成完整分发包（统一打包入口，生成 DMG、ZIP 与 SHA256 校验和清单）
+npm run package
+# 也可运行快捷命令
 npm run package:mac
 ```
 
 打包结果为本机架构的开发版 `.app`、`.dmg` 与 `.zip`，使用 ad-hoc 签名，没有 Developer ID 签名或 Apple 公证。
 
-项目配置了 GitHub Actions 自动化工作流（`.github/workflows/build-macos.yml`），基于 GitHub-hosted macOS runner（`macos-14` Apple Silicon 与 `macos-13` Intel）在云端并行构建、测试并生成 macOS 安装包（DMG 与 ZIP），支持作为 Release 或 Artifact 下载。
+项目配置了 GitHub Actions 自动化工作流（`.github/workflows/build-macos.yml`），基于 GitHub-hosted macOS ARM64 runner（`macos-14` Apple Silicon）在云端并行构建、测试并生成安装包，支持作为 Release 或 Artifact 下载。多平台打包规划及 CI 触发方式详见 [打包架构与 CI 触发设计](docs/packaging-and-ci-plan.md)。
 
 ## 当前验证情况
 
