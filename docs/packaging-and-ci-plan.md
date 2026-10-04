@@ -1,100 +1,102 @@
-# 打包架构规划与 GitHub CI 触发设计
+# 打包架构规划与 GitHub CI 触发设计 / Multi-Platform Packaging Architecture & GitHub CI Trigger Design
 
-本文档阐述 Roundtable 桌面端的多平台打包架构规划、产物标准以及 GitHub Actions Runner 的触发与发布机制。
+本文档以中英双语阐述 Roundtable 桌面端的多平台打包架构规划、产物标准以及 GitHub Actions Runner 的触发与发布机制。  
+This document explains the multi-platform packaging architecture, artifact specifications, and GitHub Actions Runner trigger & release mechanisms for Roundtable desktop in both Chinese and English.
 
 ---
 
-## 一、多平台打包架构规划
+## 一、多平台打包架构规划 / Multi-Platform Packaging Architecture
 
-Roundtable 采用模块化分层打包架构，将公共逻辑（元数据提取、哈希校验、清单记录）与各操作系统（macOS、Windows、Linux）的分发打包解耦。
+Roundtable 采用模块化分层打包架构，将公共逻辑（元数据提取、哈希校验、清单记录）与各操作系统（macOS、Windows、Linux）的分发打包解耦。  
+Roundtable adopts a modular, tiered packaging architecture, decoupling common tasks (metadata extraction, checksums, manifest generation) from platform-specific packagers (macOS, Windows, Linux).
 
-### 1. 目录结构
+### 1. 目录结构 / Directory Structure
 
 ```text
 scripts/
-├── package.js                 # 统一打包 CLI 入口（自动识别平台或按参数分发）
-├── package-mac.js             # macOS 快捷打包入口（向后兼容）
-├── build-mac.js               # macOS 应用捆绑构建（向后兼容）
+├── package.js                 # 统一打包 CLI 入口 / Unified packaging CLI entrypoint
+├── package-mac.js             # macOS 快捷打包入口 / macOS shortcut packaging script
+├── build-mac.js               # macOS 应用捆绑构建 / macOS app bundle builder
 └── packaging/
-    ├── common.js              # 公共模块（版本信息、SHA256 计算、manifest 清单生成）
-    ├── mac.js                 # macOS 专属打包器（.app 构造、ad-hoc 签名、hdiutil DMG、ditto ZIP）
-    ├── win.js                 # Windows 平台打包规划器（NSIS 安装包、绿色 Portable ZIP）
-    └── linux.js               # Linux 平台打包规划器（AppImage、.deb、.tar.gz）
+    ├── common.js              # 公共模块（版本信息、SHA256 计算、manifest 清单生成）/ Common utilities
+    ├── mac.js                 # macOS 打包器（.app 构造、ad-hoc 签名、hdiutil DMG、ditto ZIP）/ macOS packager
+    ├── win.js                 # Windows 打包规划器（NSIS 安装包、绿色 Portable ZIP）/ Windows packager roadmap
+    └── linux.js               # Linux 打包规划器（AppImage、.deb、.tar.gz）/ Linux packager roadmap
 ```
 
-### 2. 各平台预期产物标准
+### 2. 各平台产物标准 / Artifact Specifications by Platform
 
-| 平台 | 目标架构 | 交付格式 | 说明 | 当前状态 |
+| 平台 / Platform | 目标架构 / Arch | 交付格式 / Formats | 说明 / Description | 当前状态 / Status |
 | :--- | :--- | :--- | :--- | :--- |
-| **macOS** | ARM64 (Apple Silicon) | `.dmg` + `.zip` + `.sha256` | 原生 `hdiutil` UDZO 镜像与保留权限的 `ditto` 压缩包 | **已实现并验证** |
-| **macOS** | x64 (Intel) | `.dmg` + `.zip` + `.sha256` | 适配 Intel 架构 Mac 设备 | 已具备脚本能力 |
-| **Windows** | x64 / ARM64 | `.exe` + `.zip` + `.sha256` | NSIS 安装程序 (`-setup.exe`) + 绿色免安装压缩包 (`-portable.zip`) | 规划中（`packaging/win.js`） |
-| **Linux** | x64 / ARM64 | `.AppImage` + `.deb` + `.tar.gz` | 通用独立镜像、Debian 系包与绿色压缩包 | 规划中（`packaging/linux.js`） |
+| **macOS** | ARM64 (Apple Silicon) | `.dmg` + `.zip` + `.sha256` | 原生 `hdiutil` UDZO 镜像与保留权限的 `ditto` 压缩包 / Native UDZO DMG and ditto ZIP | **已实现并验证 / Implemented & Verified** |
+| **macOS** | x64 (Intel) | `.dmg` + `.zip` + `.sha256` | 适配 Intel 架构 Mac 设备 / Intel Mac bundle | 已具备脚本能力 / Script Ready |
+| **Windows** | x64 / ARM64 | `.exe` + `.zip` + `.sha256` | NSIS 安装程序 (`-setup.exe`) + 绿色便携包 (`-portable.zip`) / NSIS installer and portable zip | 规划中 / Planned (`packaging/win.js`) |
+| **Linux** | x64 / ARM64 | `.AppImage` + `.deb` + `.tar.gz` | 通用独立镜像、Debian 软件包与绿色压缩包 / AppImage, Deb, Tarball | 规划中 / Planned (`packaging/linux.js`) |
 
-### 3. 统一打包入口与清单机制
-
-开发者或 CI 统一使用如下命令执行打包：
+### 3. 统一打包入口与清单机制 / Unified Entrypoint & Manifest
 
 ```sh
-# 默认构建当前操作系统与当前 CPU 架构
+# 默认构建当前操作系统与当前 CPU 架构 / Package for current OS and architecture
 npm run package
 
-# 指定目标平台与架构（跨平台或统一指定）
+# 指定目标平台与架构 / Explicitly specify target platform and architecture
 node scripts/package.js --platform=macos --arch=arm64
 node scripts/package.js --platform=windows --arch=x64
 node scripts/package.js --platform=linux --arch=x64
 ```
 
-打包完成后，统一在 `dist/artifacts-manifest.json` 记录所有产物的文件名、路径、字节大小、可读大小以及 SHA256 校验和，供 CI 发布与下载校验。
+打包完成后，统一在 `dist/artifacts-manifest.json` 记录所有产物的文件名、路径、字节大小以及 SHA256 校验和。  
+Upon completion, `dist/artifacts-manifest.json` automatically records file names, paths, sizes, and SHA256 checksums across all platforms.
 
 ---
 
-## 二、GitHub Actions CI/CD 触发机制
+## 二、GitHub Actions CI/CD 触发机制 / GitHub Actions Trigger Mechanisms
 
-工作流配置文件位于 [.github/workflows/build-macos.yml](../.github/workflows/build-macos.yml)。支持以下四种触发方式：
+工作流配置文件位于 [.github/workflows/build-macos.yml](../.github/workflows/build-macos.yml)，支持 4 种触发方式：  
+The workflow is configured in [.github/workflows/build-macos.yml](../.github/workflows/build-macos.yml) with 4 triggering modes:
 
-### 1. 自动触发：分支推送（Push）
-- **触发条件**：向 `main` 或特性分支推送代码。
-- **动作**：GitHub 云端 Runner 自动拉取代码、安装依赖、运行 `npm run check` 语法检查与 `npm test` 单元测试，并在 Runner 上执行 `npm run package` 构建打包。
-- **产物**：自动生成 GitHub Actions Artifacts（保留 90 天），可在每次构建的详情页直接下载。
+### 1. 自动触发：分支推送 / Push Trigger
+- **中文**：向 `main` 或特性分支推送代码时自动触发。云端 Runner 自动拉取代码、安装依赖、运行 `npm run check` 与 `npm test`，并执行打包，上传保留 90 天的 Artifacts 供下载测试。
+- **English**: Triggered automatically on pushes to `main` or feature branches. Cloud runners clone code, install dependencies, run syntax checks and unit tests, compile packages, and upload workflow artifacts (retained for 90 days).
 
-### 2. 自动触发：合并请求检查（Pull Request）
-- **触发条件**：发起针对 `main` 分支的 PR，或向已有 PR 推送新 commit。
-- **动作**：自动触发门禁检查与打包测试，确保新代码在云端虚拟机中测试通过且能成功打包，绿灯后方可安全合入。
+### 2. 自动触发：合并请求检查 / Pull Request Trigger
+- **中文**：发起针对 `main` 分支的 PR 或向已有 PR 推送 commit 时触发，作为门禁自动验证测试与打包。
+- **English**: Triggered on PR opening or updates targeting `main`, serving as a quality gate ensuring tests and packaging succeed before merge.
 
-### 3. 自动发布：版本标签推送（Git Tag / Release）
-- **触发条件**：推送形如 `v*` 的版本标签，例如：
+### 3. 自动发布：版本标签推送 / Tag Release Trigger
+- **中文**：推送形如 `v*` 的版本标签时自动触发：
   ```sh
   git tag v0.3.0
   git push origin v0.3.0
   ```
-- **动作**：
-  1. Runner 自动完成测试与打包；
-  2. 触发 `release` 任务，自动在 GitHub 创建正式 Release；
-  3. 自动将生成的 `.dmg`、`.zip` 及 `.sha256` 附件上传至 Release 页面，用户可直接点击下载最新发布包。
+  Runner 在完成测试与打包后，会自动创建 GitHub Release，并将 `.dmg`、`.zip`、`.sha256` 挂载为正式 Release Assets 供用户下载。
+- **English**: Triggered on pushing version tags matching `v*`. The runner builds packages and publishes a GitHub Release, attaching `.dmg`, `.zip`, and `.sha256` assets automatically.
 
-### 4. 手动触发：即时运行（workflow_dispatch）
-- **适用场景**：临时需要最新安装包，或无需打 tag 即想发布 Release。
-- **网页端操作**：
-  1. 打开 GitHub 仓库页面，点击顶部 **Actions** 标签；
-  2. 在左侧选择 **Build macOS Packages** 工作流；
-  3. 点击右侧 **Run workflow** 下拉按钮；
-  4. 选择目标分支，可勾选 `Create a GitHub Release with built packages` 参数；
-  5. 点击绿色 **Run workflow** 按钮启动构建。
-- **命令行操作**（通过 `gh` CLI）：
-  ```sh
-  # 普通构建并产出 Artifacts
-  gh workflow run build-macos.yml
+### 4. 手动触发：即时运行 / Manual Trigger (`workflow_dispatch`)
+- **中文**：无需打 Tag 即可随时手动触发构建或发布。
+  - **网页端**：在仓库 **Actions** -> **Build macOS Packages** -> 点击 **Run workflow**（可勾选 `create_release` 参数）。
+  - **命令行**：
+    ```sh
+    # 普通构建 / Standard build
+    gh workflow run build-macos.yml
 
-  # 构建并直接发布为 GitHub Release
-  gh workflow run build-macos.yml -f create_release=true
-  ```
+    # 构建并发布 Release / Build and publish Release
+    gh workflow run build-macos.yml -f create_release=true
+    ```
+- **English**: Run on demand anytime without pushing tags.
+  - **Web UI**: Navigate to **Actions** -> **Build macOS Packages** -> click **Run workflow** (optional `create_release` checkbox).
+  - **CLI (`gh`)**:
+    ```sh
+    gh workflow run build-macos.yml
+    gh workflow run build-macos.yml -f create_release=true
+    ```
 
 ---
 
-## 三、后续多平台扩展路线
+## 三、多平台扩展路线 / Multi-Platform Roadmap
 
-当引入 Windows 和 Linux 打包时，GitHub Actions 工作流可无缝扩展为跨平台矩阵任务：
+当引入 Windows 和 Linux 打包时，工作流可平行扩展为多 OS 独立 Job：  
+When Windows and Linux packagers are implemented, the workflow expands seamlessly into parallel jobs:
 
 ```yaml
 jobs:
@@ -115,6 +117,5 @@ jobs:
 
   release:
     needs: [build-macos, build-windows, build-linux]
-    # 汇总下载所有平台产物并统一发布
+    # 统一汇总所有平台产物并发布 / Collect and publish all platform artifacts together
 ```
-这种结构使各平台构建独立隔离、互不阻塞，单平台的失败不影响其他平台的包生成。

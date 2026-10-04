@@ -24,14 +24,17 @@ npm run build:mac
 open dist/Roundtable.app
 
 # 生成完整分发包（统一打包入口，生成 DMG、ZIP 与 SHA256 校验和清单）
+# Generate full distribution packages (DMG, ZIP, and SHA256 checksums)
 npm run package
-# 也可运行快捷命令
+# 也可运行快捷命令 / Or run shortcut
 npm run package:mac
 ```
 
-打包结果为本机架构的开发版 `.app`、`.dmg` 与 `.zip`，使用 ad-hoc 签名，没有 Developer ID 签名或 Apple 公证。
+打包结果为本机架构的开发版 `.app`、`.dmg` 与 `.zip`，使用 ad-hoc 签名，没有 Developer ID 签名或 Apple 公证。  
+Packages are built with ad-hoc signing for local architecture, without Developer ID signing or Apple notarization.
 
-项目配置了 GitHub Actions 自动化工作流（`.github/workflows/build-macos.yml`），基于 GitHub-hosted macOS ARM64 runner（`macos-14` Apple Silicon）在云端并行构建、测试并生成安装包，支持作为 Release 或 Artifact 下载。多平台打包规划及 CI 触发方式详见 [打包架构与 CI 触发设计](docs/packaging-and-ci-plan.md)。
+项目配置了 GitHub Actions 自动化工作流（`.github/workflows/build-macos.yml`），基于 GitHub-hosted macOS ARM64 runner（`macos-14` Apple Silicon）在云端并行构建、测试并生成安装包，支持作为 Release 或 Artifact 下载。多平台打包规划及 CI 触发方式详见 [打包架构与 CI 触发设计](docs/packaging-and-ci-plan.md)，GitHub 分支与标签保护规则详见 [GitHub 规则集说明](docs/github-rulesets.md)。  
+The project includes a GitHub Actions workflow (`.github/workflows/build-macos.yml`) using GitHub-hosted macOS ARM64 runners (`macos-14` Apple Silicon) to build, test, and package applications as Releases or Artifacts. For multi-platform packaging and CI triggers, see [Packaging Architecture & CI Plan](docs/packaging-and-ci-plan.md); for branch and tag protection rules, see [GitHub Rulesets Guide](docs/github-rulesets.md).
 
 ## 当前验证情况
 

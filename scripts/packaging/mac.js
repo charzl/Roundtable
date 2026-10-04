@@ -89,10 +89,10 @@ export function packageMac(rootDir = resolve('.'), options = {}) {
   const zipPath = join(distDir, `${baseName}.zip`);
   const checksumPath = join(distDir, `${baseName}.sha256`);
 
-  console.log(`\n正在为 macOS (${arch}) 打包分发文件...`);
+  console.log(`\n正在为 macOS (${arch}) 打包分发文件 / Packaging distribution files for macOS (${arch})...`);
 
-  // 1. 生成 DMG
-  console.log(`[1/3] 生成 DMG 镜像: ${dmgPath}`);
+  // 1. 生成 DMG / Generate DMG
+  console.log(`[1/3] 生成 DMG 镜像 / Generating DMG image: ${dmgPath}`);
   const hdiutil = spawnSync('/usr/bin/hdiutil', [
     'create',
     '-volname', 'Roundtable',
@@ -101,10 +101,10 @@ export function packageMac(rootDir = resolve('.'), options = {}) {
     '-format', 'UDZO',
     dmgPath
   ], { stdio: 'inherit' });
-  if (hdiutil.status !== 0) throw new Error('hdiutil 生成 DMG 失败');
+  if (hdiutil.status !== 0) throw new Error('hdiutil 生成 DMG 失败 / hdiutil failed to generate DMG');
 
-  // 2. 生成 ZIP
-  console.log(`[2/3] 生成 ZIP 压缩包 (ditto): ${zipPath}`);
+  // 2. 生成 ZIP / Generate ZIP
+  console.log(`[2/3] 生成 ZIP 压缩包 (ditto) / Generating ZIP archive (ditto): ${zipPath}`);
   const ditto = spawnSync('/usr/bin/ditto', [
     '-c',
     '-k',
@@ -113,10 +113,10 @@ export function packageMac(rootDir = resolve('.'), options = {}) {
     appPath,
     zipPath
   ], { stdio: 'inherit' });
-  if (ditto.status !== 0) throw new Error('ditto 生成 ZIP 失败');
+  if (ditto.status !== 0) throw new Error('ditto 生成 ZIP 失败 / ditto failed to generate ZIP');
 
-  // 3. 生成校验和及清单
-  console.log(`[3/3] 生成 SHA256 校验和与清单...`);
+  // 3. 生成校验和及清单 / Generate checksums and manifest
+  console.log(`[3/3] 生成 SHA256 校验和与清单 / Generating SHA256 checksums and manifest...`);
   generateChecksumFile([dmgPath, zipPath], checksumPath);
   generateManifest({
     rootDir,

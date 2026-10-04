@@ -37,10 +37,10 @@ const options = parseArgs();
 const project = getProjectInfo(rootDir);
 
 console.log(`========================================`);
-console.log(`Roundtable 统一打包器`);
-console.log(`版本: ${project.version}`);
-console.log(`目标平台: ${options.platform}`);
-console.log(`目标架构: ${options.arch}`);
+console.log(`Roundtable 统一打包器 / Unified Packager`);
+console.log(`版本 / Version: ${project.version}`);
+console.log(`目标平台 / Target Platform: ${options.platform}`);
+console.log(`目标架构 / Target Architecture: ${options.arch}`);
 console.log(`========================================`);
 
 try {
@@ -60,11 +60,11 @@ try {
       result = packageLinux(rootDir, options);
       break;
     default:
-      throw new Error(`不支持的目标平台: ${options.platform}`);
+      throw new Error(`不支持的目标平台 / Unsupported platform: ${options.platform}`);
   }
 
-  console.log(`\n打包成功！清单已记录至: dist/artifacts-manifest.json`);
+  console.log(`\n打包成功！清单已记录至 / Packaging succeeded! Manifest saved to: dist/artifacts-manifest.json`);
 } catch (err) {
-  console.error(`\n打包出错: ${err.message}`);
+  console.error(`\n打包出错 / Packaging error: ${err.message}`);
   process.exit(1);
 }
