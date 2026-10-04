@@ -1,20 +1,24 @@
 {
   "name": "roundtable",
   "version": "0.2.2",
-  "description": "Roundtable (圆桌会议) - Multi-stack architecture: JavaScript, Python, and Swift",
+  "description": "Roundtable (圆桌会议) - Primary stacks: Python & Swift (JavaScript deprecated for reference)",
   "private": true,
   "type": "module",
   "scripts": {
-    "start": "npm --prefix javascript start",
-    "serve": "npm --prefix javascript run serve",
-    "test": "npm --prefix javascript test",
-    "check": "npm --prefix javascript run check",
-    "import:mcp": "npm --prefix javascript run import:mcp",
+    "start": "cd python && python3 main.py",
+    "start:python": "cd python && python3 main.py",
+    "start:swift": "open swift/dist/Roundtable-Swift.app || cd swift && swift run",
+    "start:deprecated:js": "npm --prefix javascript-deprecated start",
+    "test": "python3 -m unittest discover -s python/tests -p 'test_*.py' && npm --prefix javascript-deprecated test",
+    "test:python": "python3 -m unittest discover -s python/tests -p 'test_*.py'",
+    "test:deprecated:js": "npm --prefix javascript-deprecated test",
+    "check": "npm --prefix javascript-deprecated run check",
+    "import:mcp": "npm --prefix javascript-deprecated run import:mcp",
     "package": "node package-all.js",
     "package:all": "node package-all.js",
-    "package:mac": "npm --prefix javascript run package:mac",
     "package:python": "cd python && python3 package.py",
     "package:swift": "cd swift && bash package.sh",
+    "package:deprecated:js": "npm --prefix javascript-deprecated run package:mac",
     "benchmark": "python3 benchmark.py"
   }
 }

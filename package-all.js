@@ -29,11 +29,11 @@ console.log('===================================================================
 
 const results = [];
 
-// 1. Package JavaScript / Electron
-console.log('📦 [1/3] 打包 JavaScript / Electron 客户端 (DMG & ZIP)...');
+// 1. Package JavaScript / Electron (Deprecated)
+console.log('📦 [1/3] 打包 JavaScript / Electron 客户端 (已废弃供参考 / Deprecated) (DMG & ZIP)...');
 try {
-  execSync('npm --prefix javascript run package:mac', { stdio: 'inherit', cwd: root });
-  const jsDist = existsSync(join(root, 'javascript/dist')) ? join(root, 'javascript/dist') : rootDist;
+  execSync('npm --prefix javascript-deprecated run package:mac', { stdio: 'inherit', cwd: root });
+  const jsDist = existsSync(join(root, 'javascript-deprecated/dist')) ? join(root, 'javascript-deprecated/dist') : rootDist;
   for (const f of readdirSync(jsDist)) {
     if (f.startsWith('Roundtable-') && !f.includes('PySide') && !f.includes('Swift')) {
       const src = join(jsDist, f);
@@ -41,7 +41,7 @@ try {
       if (src !== dest && statSync(src).isFile()) cpSync(src, dest);
     }
   }
-  results.push({ stack: 'JavaScript (Electron)', status: 'success' });
+  results.push({ stack: 'JavaScript (Electron, Deprecated)', status: 'success' });
 } catch (e) {
   console.error('⚠️ JavaScript 打包出错:', e.message);
   results.push({ stack: 'JavaScript (Electron)', status: 'failed', error: e.message });

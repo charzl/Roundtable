@@ -2,17 +2,17 @@
 
 让人和多个真实 AI agent 在同一场会议里提问、回应、核查和反驳，形成有依据、保留异议的决策稿。
 
-当前项目采用多技术栈并行架构（Multi-Stack Architecture）：
-- 🐍 **`python/`**：**Python + PySide6 客户端**（聚焦开发：跨端灵活、包体仅 78MB、内存仅 140MB，详见 [python/README.md](python/README.md)）
-- 🍎 **`swift/`**：**Swift 6.4 原生客户端**（聚焦开发：macOS 原生极致体验、包体不足 1MB、内存仅 100MB、未来直通 iOS，详见 [swift/README.md](swift/README.md)）
-- ⚡ **`javascript/`**：**JavaScript / Electron 客户端**（原有基线版本：Node.js 22 本地服务守护进程与 Electron 界面，详见 [javascript/README.md](javascript/README.md)）
+当前项目架构规划（Architecture）：
+- 🐍 **`python/`**：**Python + PySide6 客户端**（主力开发：跨端灵活、包体仅 27MB、内存仅 80MB，详见 [python/README.md](python/README.md)）
+- 🍎 **`swift/`**：**Swift 6.4 原生客户端**（主力开发：macOS 原生极致体验、包体仅 0.48MB、内存仅 48MB、未来直通 iOS，详见 [swift/README.md](swift/README.md)）
+- 📦 **`javascript-deprecated/`**：**JavaScript / Electron 客户端**（已废弃归档供参考：保留全部 41 项单测、MCP 导入器与原始 UI 设计，详见 [javascript-deprecated/README.md](javascript-deprecated/README.md)）
 - 📊 **`benchmark.py`**：全架构实测数据与能效分析工具（详见 [跨架构实测报告](docs/benchmark-comparison.md)）
 
 ---
 
 ## 快速导航与本地使用 / Getting Started
 
-### 1. 运行 Python 客户端 (推荐)
+### 1. 运行 Python 客户端 (主力开发)
 ```sh
 cd python
 python3 -m venv .venv && source .venv/bin/activate
@@ -20,16 +20,16 @@ pip install -r requirements.txt
 python main.py
 ```
 
-### 2. 运行 Swift 原生客户端 (macOS 极致体验)
+### 2. 运行 Swift 原生客户端 (主力开发 · macOS 极致秒开)
 ```sh
 cd swift
 swift run
 ```
 
-### 3. 运行 JavaScript / Electron 客户端 (基线版本)
+### 3. 运行 JavaScript / Electron 客户端 (已废弃 · 仅供参考)
 ```sh
-npm ci --prefix javascript
-npm start
+npm ci --prefix javascript-deprecated
+npm run start:deprecated:js
 ```
 
 创建会议时可选择「共同讨论」或「独立调查」，选择 Leader（负责最终总结）和会议输出语言，再选择参会者与轮数。共同讨论依次发言；独立调查让 Codex、Claude 同时分析同一题目，报告齐备后统一公开，再依次对比、核查与讨论。调查算第 1 轮。默认最多 10 轮；一轮内所有参会者各公开发言一次。只有全员在同一轮建议总结，才自动提前结束；仍可保留交给用户判断的异议和问题。人类在 agent 发言期间提交的内容会排队，于回合边界公开。共同讨论的暂停在当前回合结束后生效；独立调查暂停会取消在途调用，保留已封存报告。结束会取消在途调用并整理已有材料。独立调查失败可单独重试、明确跳过，或暂停后按新题目重做；缺席不计为同意。
