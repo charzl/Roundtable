@@ -5,6 +5,7 @@ Meeting coordination engine and provider runner for PySide6 Roundtable.
 import json
 import shutil
 import subprocess
+from typing import Callable, Optional, Dict, Any, List
 try:
     from PySide6.QtCore import QObject, Signal, QThread
 except ImportError:
