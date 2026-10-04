@@ -27,7 +27,7 @@ function renderParticipants() {
     const row = element('div', undefined, 'participant' + (m.activeParticipants?.includes(id) || m.activeParticipant === id ? ' active' : ''));
     row.append(element('span', id === 'human' ? t('participants.human') : providerName(id).slice(0, 2), 'avatar'));
     const content = element('div'), status = m.participantStates[id], latest = m.calls.findLast(c => c.participant === id);
-    content.append(element('strong', providerName(id)), element('small', id === 'human' ? t('participants.host') : status === 'completed' ? t('status.completedCall') : status ? label(status) : t('participants.wait')));
+    content.append(element('strong', providerName(id))); if (id === m.leader) content.append(element('span', t('participants.leader'), 'badge')); content.append(element('small', id === 'human' ? t('participants.host') : status === 'completed' ? t('status.completedCall') : status ? label(status) : t('participants.wait')));
     if (latest?.model) content.append(element('small', latest.model));
     if (id !== 'human' && investigating(m) && m.status === 'paused' && !activeReport(m, id) && !m.skipped.includes(id)) {
       const controls = element('div', undefined, 'small-actions');
@@ -91,7 +91,7 @@ function render() {
   $('#pause-button').hidden = m.status !== 'running'; $('#pause-button').disabled = m.pauseRequested; $('#finish-button').hidden = ['completed', 'finalizing'].includes(m.status);
   $('#restart-button').hidden = !(investigating(m) && m.status === 'paused'); $('#meeting-error').hidden = !m.error; if (m.error) renderError($('#meeting-error'), m.error);
   $('#message-input').disabled = ['completed', 'finalizing'].includes(m.status); $('#composer button').disabled = $('#message-input').disabled; $('#compose-note').textContent = t(investigating(m) ? 'composer.independent' : m.status === 'running' ? 'composer.running' : 'composer.normal');
-  summaryOptions($('#meeting-summarizer'), m.participants, m.summarizer || m.participants[0]); $('#meeting-summarizer').disabled = m.status === 'finalizing';
+  summaryOptions($('#meeting-leader'), m.participants, m.leader || m.summarizer || m.participants[0]); $('#meeting-leader').disabled = m.status === 'finalizing';
   $('#output-language-label').textContent = t('meeting.output', { language: i18n.manifest.languages.find(p => p.id === m.outputLanguage)?.name || t('language.system') });
   $('[data-tab=reports]').hidden = m.mode !== 'independent'; for (const b of document.querySelectorAll('[data-tab]')) b.setAttribute('aria-selected', String(b.dataset.tab === state.tab));
   for (const tab of ['discussion', 'reports', 'decision']) $('#' + tab + '-panel').hidden = state.tab !== tab;
@@ -101,7 +101,7 @@ function render() {
 function updateMode() {
   const independent = $('#mode-input').value === 'independent'; $('#mode-note').hidden = !independent; $('#timeout-row').hidden = !independent;
   for (const p of state.config.providers) { const input = $('#provider-' + p.id); input.disabled = !p.executable || (independent && !p.independent); if (input.disabled) input.checked = false; }
-  const participants = [...document.querySelectorAll('input[name=participant]:checked')].map(n => n.value); summaryOptions($('#summarizer-input'), participants, $('#summarizer-input').value);
+  const participants = [...document.querySelectorAll('input[name=participant]:checked')].map(n => n.value); summaryOptions($('#leader-input'), participants, $('#leader-input').value);
 }
 function renderConfig(preserve = true) {
   const prior = preserve ? [...document.querySelectorAll('input[name=participant]:checked')].map(n => n.value) : null;
@@ -109,8 +109,9 @@ function renderConfig(preserve = true) {
   const overview = $('#provider-overview'), choices = $('#provider-choices'); overview.replaceChildren(); choices.replaceChildren();
   for (const p of state.config.providers) {
     const card = element('div', undefined, 'provider-card'); card.append(element('strong', p.name), element('span', label(p.status))); overview.append(card);
-    const choice = element('div', undefined, 'provider-choice'), input = element('input'); input.type = 'checkbox'; input.value = p.id; input.name = 'participant'; input.id = 'provider-' + p.id; input.disabled = !p.executable; input.checked = !!p.executable && (prior ? prior.includes(p.id) : p.id !== 'agy'); input.onchange = updateMode;
-    const l = element('label', p.name); l.htmlFor = input.id; l.append(element('small', label(p.status) + (p.id === 'agy' ? ' · ' + t('provider.agy') : ' · ' + p.provider))); if (!p.independent) l.append(element('small', t('provider.noIndependent')));
+    const choice = element('div', undefined, 'provider-choice'), input = element('input'); input.type = 'checkbox'; input.value = p.id; input.name = 'participant'; input.id = 'provider-' + p.id; input.disabled = !p.executable; input.checked = !!p.executable && (prior ? prior.includes(p.id) : true); input.onchange = updateMode;
+    const l = element('label', p.name); l.htmlFor = input.id; l.append(element('small', label(p.status) + (p.id === 'agy' ? ' · ' + t('provider.agy') : ' · ' + p.provider))); if (p.id === 'agy' && p.independent) l.append(element('small', t('provider.agyIndependent')));
+    if (!p.independent) l.append(element('small', t('provider.noIndependent')));
     const model = element('input'); model.type = 'text'; model.id = 'model-' + p.id; model.placeholder = t('provider.defaultModel'); model.setAttribute('aria-label', t('provider.model', { name: p.name })); model.maxLength = 160; model.className = 'model-input'; model.disabled = !p.executable; model.value = modelValues[model.id] || ''; choice.append(input, l, model); choices.append(choice);
   }
   updateMode();
@@ -126,10 +127,10 @@ for (const selector of ['#new-button', '#welcome-new']) $(selector).onclick = op
 document.querySelectorAll('[data-close]').forEach(b => b.onclick = () => $('#' + b.dataset.close).close());
 document.querySelectorAll('[data-tab]').forEach(b => b.onclick = () => { state.tab = b.dataset.tab; render(); });
 $('#mode-input').onchange = updateMode;
-$('#new-form').onsubmit = async e => { e.preventDefault(); try { const participants = [...document.querySelectorAll('input[name=participant]:checked')].map(n => n.value); if (participants.length < 2) throw new Error(t('error.selectParticipants')); const models = Object.fromEntries(participants.map(id => [id, $('#model-' + id).value.trim()]).filter(([, m]) => m)); const meeting = await action('/api/meetings', { topic: $('#topic-input').value, participants, models, maxRounds: Number($('#round-input').value), mode: $('#mode-input').value, summarizer: $('#summarizer-input').value, languageChoice: $('#meeting-language').value, investigationTimeoutMinutes: Number($('#timeout-input').value) }); $('#new-dialog').close(); $('#topic-input').value = ''; state.meetings = await api('/api/meetings'); setCurrent(meeting); } catch (error) { if (!error.code) messageError(error); } };
+$('#new-form').onsubmit = async e => { e.preventDefault(); try { const participants = [...document.querySelectorAll('input[name=participant]:checked')].map(n => n.value); if (participants.length < 2) throw new Error(t('error.selectParticipants')); const models = Object.fromEntries(participants.map(id => [id, $('#model-' + id).value.trim()]).filter(([, m]) => m)); const meeting = await action('/api/meetings', { topic: $('#topic-input').value, participants, models, maxRounds: Number($('#round-input').value), mode: $('#mode-input').value, leader: $('#leader-input').value, languageChoice: $('#meeting-language').value, investigationTimeoutMinutes: Number($('#timeout-input').value) }); $('#new-dialog').close(); $('#topic-input').value = ''; state.meetings = await api('/api/meetings'); setCurrent(meeting); } catch (error) { if (!error.code) messageError(error); } };
 $('#composer').onsubmit = async e => { e.preventDefault(); try { state.current = await action(`/api/meetings/${state.current.id}/messages`, { text: $('#message-input').value }); $('#message-input').value = ''; render(); } catch {} };
 for (const verb of ['start', 'pause', 'finish']) $('#' + verb + '-button').onclick = async () => { try { state.current = await action(`/api/meetings/${state.current.id}/${verb}`); render(); } catch {} };
-$('#meeting-summarizer').onchange = async () => { try { state.current = await action(`/api/meetings/${state.current.id}/summarizer`, { participant: $('#meeting-summarizer').value }); render(); } catch {} };
+$('#meeting-leader').onchange = async () => { try { state.current = await action(`/api/meetings/${state.current.id}/leader`, { participant: $('#meeting-leader').value }); render(); } catch {} };
 $('#restart-button').onclick = () => { $('#restart-topic').value = state.current.topic; languageOptions($('#restart-language'), state.current.languageChoice); $('#restart-dialog').showModal(); };
 $('#restart-form').onsubmit = async e => { e.preventDefault(); try { state.current = await action(`/api/meetings/${state.current.id}/restart`, { topic: $('#restart-topic').value, languageChoice: $('#restart-language').value }); $('#restart-dialog').close(); render(); } catch {} };
 $('#interface-language').onchange = async () => { try { await applyPreferences(await api('/api/preferences', { method: 'PUT', body: JSON.stringify({ languageChoice: $('#interface-language').value }) })); } catch (e) { messageError(e); } };

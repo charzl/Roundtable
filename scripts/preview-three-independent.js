@@ -1,0 +1,17 @@
+import { _electron as electron } from 'playwright';
+import { resolve,join } from 'node:path';
+import { mkdirSync,readFileSync,writeFileSync } from 'node:fs';
+import assert from 'node:assert/strict';
+const root=resolve('output/verification/three-independent-desktop');mkdirSync(root,{recursive:true});
+const id=readFileSync('output/verification/three-independent-real/meeting-id.txt','utf8').trim();
+const env={...process.env,ROUNDTABLE_DATA_DIR:resolve('.roundtable')};delete env.ELECTRON_RUN_AS_NODE;
+const app=await electron.launch({executablePath:resolve('dist/Roundtable.app/Contents/MacOS/Roundtable'),env,timeout:20000});
+try{
+ const page=await app.firstWindow(),errors=[];page.on('pageerror',e=>errors.push(e.message));await page.locator('#interface-language option').first().waitFor({state:'attached'});await page.locator('#interface-language').selectOption('zh-Hans');
+ const bootstrap=await page.evaluate(()=>window.roundtableDesktop.bootstrap());const meetings=await page.evaluate(async b=>(await fetch(b.url+'/api/meetings',{headers:{Authorization:'Bearer '+b.token}})).json(),bootstrap);const m=meetings.find(m=>m.id===id);assert.ok(m);assert.equal(m.leader,'claude');assert.equal(m.decision.author,'claude');const callsBefore=m.calls.length;
+ await page.locator('.meeting-link').nth(meetings.findIndex(m=>m.id===id)).click();await page.locator('[data-tab=reports]').click();assert.equal(await page.locator('.report-card').count(),3);assert.ok((await page.locator('.report-card h2').allTextContents()).includes('Antigravity'));assert.equal(await page.locator('#meeting-leader').inputValue(),'claude');await page.locator('#participants .participant').filter({hasText:'Claude'}).locator('.badge').waitFor();await page.screenshot({path:join(root,'reports-zh.png'),fullPage:true});
+ await page.locator('[data-tab=decision]').click();await page.getByText('Leader Claude 整理的最终总结 · 由你最终决定',{exact:true}).waitFor();await page.locator('#decision-panel .decision-option').first().waitFor();await page.screenshot({path:join(root,'summary-zh.png'),fullPage:true});
+ await page.locator('#new-button').click();await page.locator('#mode-input').selectOption('independent');assert.equal(await page.locator('#provider-agy').isDisabled(),false);assert.equal(await page.locator('#provider-agy').isChecked(),true);await page.locator('#leader-input').selectOption('agy');assert.equal(await page.locator('#leader-input').inputValue(),'agy');await page.screenshot({path:join(root,'new-three-zh.png'),fullPage:true});await page.locator('[data-close=new-dialog]').first().click();
+ const exported=await page.evaluate(async({b,id})=>(await fetch(b.url+'/api/meetings/'+id+'/export',{headers:{Authorization:'Bearer '+b.token}})).json(),{b:bootstrap,id});assert.equal(exported.meeting.calls.length,callsBefore);assert.equal(exported.artifacts.length,7);assert.ok(exported.artifacts.every(a=>Object.values(a.files).every(f=>typeof f==='string')&&['prompt.md','raw.jsonl','manifest.json'].every(k=>a.files[k].length>0)));assert.deepEqual(errors,[]);
+ const result={ok:true,meetingId:id,reportCards:3,agyIndependentSelectable:true,agySelectedByDefault:true,leaderSelectable:'agy',summaryAuthor:m.decision.author,summaryRole:m.decision.role,exportedCalls:7,providerCallsDuringPreview:0,errors};writeFileSync(join(root,'result.json'),JSON.stringify(result,null,2));console.log(JSON.stringify(result));
+}finally{await app.close();}

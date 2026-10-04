@@ -9,7 +9,7 @@
 <section id="welcome" class="welcome"><div class="eyebrow" data-i18n="welcome.eyebrow"></div><h1 data-i18n="welcome.title"></h1><p data-i18n="welcome.body"></p><button id="welcome-new" class="primary" data-i18n="welcome.start"></button><div id="provider-overview"></div></section>
 <section id="meeting" hidden>
 <div class="meeting-heading"><div><div class="eyebrow" id="round-label"></div><h1 id="topic"></h1></div><button id="export-button" data-i18n="export"></button></div>
-<div class="meeting-settings"><label for="meeting-summarizer" data-i18n="meeting.summarizer"></label><select id="meeting-summarizer"></select><span id="output-language-label" class="muted"></span></div>
+<div class="meeting-settings"><label for="meeting-leader" data-i18n="meeting.leader"></label><select id="meeting-leader"></select><span id="output-language-label" class="muted"></span></div>
 <div class="tabs" role="tablist"><button role="tab" aria-selected="true" data-tab="discussion" data-i18n="tab.discussion"></button><button role="tab" aria-selected="false" data-tab="reports" data-i18n="tab.reports" hidden></button><button role="tab" aria-selected="false" data-tab="decision" data-i18n="tab.decision"></button></div>
 <div class="controls"><span id="turn-state" aria-live="polite"></span><div><button id="start-button" class="primary"></button><button id="pause-button" data-i18n="action.pause"></button><button id="restart-button" data-i18n="action.restart" hidden></button><button id="finish-button" data-i18n="action.finish"></button></div></div>
 <div id="history-notice" class="error" role="status" hidden></div>
@@ -23,7 +23,7 @@
 <dialog id="new-dialog"><form id="new-form"><div class="dialog-header"><h2 data-i18n="new.title"></h2><button type="button" data-close="new-dialog" data-i18n-aria="action.close">×</button></div><label for="topic-input" data-i18n="new.topic"></label><textarea id="topic-input" rows="4" required maxlength="12000" data-i18n-placeholder="new.placeholder"></textarea>
 <div class="form-row"><label for="mode-input" data-i18n="new.mode"></label><select id="mode-input"><option value="discussion" data-i18n="mode.discussion"></option><option value="independent" data-i18n="mode.independent"></option></select></div><p id="mode-note" class="muted" data-i18n="new.modeNote" hidden></p>
 <fieldset><legend data-i18n="new.participants"></legend><div id="provider-choices"></div></fieldset>
-<div class="form-row"><label for="summarizer-input" data-i18n="new.summarizer"></label><select id="summarizer-input" required></select></div>
+<div class="form-row"><label for="leader-input" data-i18n="new.leader"></label><select id="leader-input" required></select></div>
 <div class="form-row"><label for="round-input" data-i18n="new.rounds"></label><input id="round-input" type="number" min="1" max="10" value="10" required></div>
 <div class="form-row"><label for="meeting-language" data-i18n="new.language"></label><select id="meeting-language"></select></div>
 <div id="timeout-row" class="form-row" hidden><label for="timeout-input" data-i18n="new.timeout"></label><input id="timeout-input" type="number" min="1" max="30" value="10" required></div>

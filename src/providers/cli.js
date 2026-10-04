@@ -16,7 +16,7 @@ export function resolveExecutable(name, env = process.env) {
   return (env.PATH || '').split(delimiter).map(p => join(p, name)).find(existsSync) || null;
 }
 export function inventory() {
-  return PROVIDERS.map(p => ({ ...p, executable: resolveExecutable(p.id), status: resolveExecutable(p.id) ? 'installed' : 'missing', independent: isolationAvailable() && p.id !== 'agy' }));
+  return PROVIDERS.map(p => ({ ...p, executable: resolveExecutable(p.id), status: resolveExecutable(p.id) ? 'installed' : 'missing', independent: isolationAvailable(), scopedMcp: p.id !== 'agy' }));
 }
 export function safeEnvironment() {
   const allowed = ['PATH', 'HOME', 'USER', 'LOGNAME', 'SHELL', 'TMPDIR', 'LANG', 'LC_ALL', 'CODEX_HOME', 'OPENAI_API_KEY', 'ANTHROPIC_API_KEY', 'CLAUDE_CODE_OAUTH_TOKEN'];
@@ -65,14 +65,13 @@ export async function runCli(id, opts) {
   const executable = resolveExecutable(invocation.command);
   if (!executable) throw new Error(`${invocation.command} 尚未安装或不在 PATH 中。`);
   mkdirSync(opts.artifactDir, { recursive: true, mode: 0o700 });
-  if (opts.independent && id === 'agy') throw new Error('AGY 的独立工具范围尚未验证；目前可在讨论模式参会');
   const launch = opts.independent ? isolateInvocation(executable, invocation.args, { callDir: opts.artifactDir, protectedRoots: opts.protectedRoots }) : { command: executable, args: invocation.args };
   writeFileSync(join(opts.artifactDir, 'prompt.md'), opts.prompt);
   writeFileSync(join(opts.artifactDir, 'raw.jsonl'), ''); writeFileSync(join(opts.artifactDir, 'stderr.txt'), '');
   const manifest = { participant: id, executable, modelRequested: opts.model || null,
     promptSha256: createHash('sha256').update(opts.prompt).digest('hex'), skillSha256: opts.skillHash, mcpConfigSha256: opts.mcpHash,
     mcpNames: id === 'agy' ? [] : Object.keys(opts.mcpServers), outputLanguage: opts.outputLanguage || null, inputHash: opts.inputHash || null,
-    isolation: opts.independent ? 'macos-protected-data-tree' : null, startedAt: new Date().toISOString(), cwd: opts.workspace };
+    isolation: opts.independent ? 'macos-protected-data-tree' : null, scopedMcp: id !== 'agy', externalMcpIsolation: id === 'agy' ? 'unverified-global-config' : opts.independent ? 'external-mcp-omitted' : 'shared-config', startedAt: new Date().toISOString(), cwd: opts.workspace };
   writeFileSync(join(opts.artifactDir, 'manifest.json'), JSON.stringify(manifest, null, 2));
   return new Promise(resolve => {
     let raw = '', stderr = '', lineBuffer = '', timedOut = false, cancelled = false, overflow = false;

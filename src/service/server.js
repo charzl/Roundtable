@@ -62,7 +62,7 @@ export async function startService({ dataDir, port = 0, runner, nodePath, getSys
         if (req.method === 'GET') return json(meetings.list());
         if (req.method === 'POST') return json(meetings.create(await body(req)), 201);
       }
-      const match = url.pathname.match(/^\/api\/meetings\/([a-zA-Z0-9-]+)(?:\/(start|pause|finish|messages|export|summarizer|skip|retry|restart|summary|decision))?$/);
+      const match = url.pathname.match(/^\/api\/meetings\/([a-zA-Z0-9-]+)(?:\/(start|pause|finish|messages|export|leader|summarizer|skip|retry|restart|summary|decision))?$/);
       if (match) {
         const [,id,action] = match;
         if (req.method === 'GET' && !action) return json(meetings.view(id));
@@ -72,7 +72,7 @@ export async function startService({ dataDir, port = 0, runner, nodePath, getSys
         }
         if (req.method === 'POST') {
           if (action === 'messages') return json(meetings.send(id, (await body(req)).text));
-          if (action === 'summarizer') return json(meetings.setSummarizer(id, (await body(req)).participant));
+          if (action === 'leader' || action === 'summarizer') return json(meetings.setLeader(id, (await body(req)).participant));
           if (action === 'skip') return json(meetings.skip(id, (await body(req)).participant));
           if (action === 'retry') return json(meetings.retry(id, (await body(req)).participant));
           if (action === 'restart') return json(meetings.restartInvestigation(id, await body(req)));
