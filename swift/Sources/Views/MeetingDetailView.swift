@@ -31,10 +31,19 @@ public struct MeetingDetailView: View {
                         .controlSize(.small)
                 }
 
-                // Leader & Language Bar
+                // Roles & Judge Bar
                 HStack(spacing: 16) {
                     HStack(spacing: 4) {
-                        Text("会议 Leader:")
+                        Text("组织者:")
+                            .font(.system(size: 12))
+                            .foregroundColor(.rtMuted)
+                        Text(knownParticipants[coordinator.currentMeeting.organizer]?.name ?? coordinator.currentMeeting.organizer)
+                            .font(.system(size: 12, weight: .semibold))
+                            .foregroundColor(.rtInk)
+                    }
+
+                    HStack(spacing: 4) {
+                        Text("负责人:")
                             .font(.system(size: 12))
                             .foregroundColor(.rtMuted)
                         Text(knownParticipants[coordinator.currentMeeting.leader]?.name ?? coordinator.currentMeeting.leader)
@@ -42,9 +51,9 @@ public struct MeetingDetailView: View {
                             .foregroundColor(.rtInk)
                     }
 
-                    Text("输出语言: 随系统")
-                        .font(.system(size: 12))
-                        .foregroundColor(.rtMuted)
+                    Text("Judge: 你 (负责追问与裁决)")
+                        .font(.system(size: 12, weight: .semibold))
+                        .foregroundColor(.rtAccent)
 
                     Spacer()
                 }
@@ -143,27 +152,27 @@ public struct MeetingDetailView: View {
                     }
                 }
 
-                // Bottom Human Interruption Composer
+                // Bottom Judge Interruption Composer
                 VStack(alignment: .leading, spacing: 6) {
-                    Text("插话或补充判断标准")
+                    Text("⚖️ Judge 提问与补充标准")
                         .font(.system(size: 13, weight: .medium))
                         .foregroundColor(.rtInk)
 
-                    TextField("例如：请先核实这个假设，再讨论方案。", text: $humanInput)
+                    TextField("作为 Judge 追问、质疑假设或更新判断标准...", text: $humanInput)
                         .textFieldStyle(.roundedBorder)
                         .onSubmit {
                             submitSpeech()
                         }
 
                     HStack {
-                        Text("发言会加入共同会议记录。")
+                        Text("Judge 的提问将作为参会 AI 的最新指导要求展开响应。")
                             .font(.system(size: 11))
                             .foregroundColor(.rtMuted)
 
                         Spacer()
 
                         Button(action: submitSpeech) {
-                            Text("提交发言")
+                            Text("提交 Judge 提问")
                                 .font(.system(size: 12, weight: .semibold))
                                 .foregroundColor(.white)
                                 .padding(.horizontal, 14)

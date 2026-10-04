@@ -28,7 +28,28 @@ public class MeetingCoordinator: ObservableObject {
                     continue
                 }
 
-                for participant in currentMeeting.participants {
+                // Round 1 standalone organizer kickoff for 4+ participants
+                if currentMeeting.round == 1 && currentMeeting.participants.count >= 4 && currentMeeting.messages.isEmpty {
+                    let orgName = knownParticipants[currentMeeting.organizer]?.name ?? currentMeeting.organizer
+                    let ldrName = knownParticipants[currentMeeting.leader]?.name ?? currentMeeting.leader
+                    let kickoffMsg = Message(
+                        id: "M-01-00-kickoff",
+                        author: currentMeeting.organizer,
+                        text: "[\(orgName) · 组织者] 圆桌会议正式开始。\n本次会议由 Judge (人类裁决者) 设定议题：「\(currentMeeting.topic)」，由 Judge 主导追问与最终裁定。\n本场讨论由负责人 \(ldrName) 牵头，请各位圆桌成员专注方案展开论证。",
+                        round: 1,
+                        readyToConclude: false,
+                        claims: [
+                            Claim(id: "C-kickoff-01", text: "组织者 \(orgName) 确立的议程基准", kind: "agenda", sources: [currentMeeting.topic], limitations: "针对 Judge 目标设定")
+                        ]
+                    )
+                    currentMeeting.messages.append(kickoffMsg)
+                    onUpdate(currentMeeting)
+                    try? await Task.sleep(nanoseconds: 300_000_000)
+                }
+
+                let activeSpeakers = currentMeeting.getActiveSpeakers()
+
+                for participant in activeSpeakers {
                     guard isRunning else { break }
                     while isPaused && isRunning {
                         try? await Task.sleep(nanoseconds: 300_000_000)
@@ -36,13 +57,14 @@ public class MeetingCoordinator: ObservableObject {
                     guard isRunning else { break }
 
                     let info = knownParticipants[participant]?.name ?? participant
-                    statusMessage = "轮到 \(info) (第 \(currentMeeting.round) 轮)..."
+                    let roleLabel = currentMeeting.getRoleLabel(participantId: participant)
+                    statusMessage = "轮到 \(info) (\(roleLabel)) 第 \(currentMeeting.round) 轮发言..."
 
                     // Simulate thinking / I/O latency
-                    try? await Task.sleep(nanoseconds: 500_000_000)
+                    try? await Task.sleep(nanoseconds: 400_000_000)
 
                     let msgId = "M-\(String(format: "%02d", currentMeeting.round))-\(String(format: "%02d", currentMeeting.messages.count + 1))"
-                    let speechText = "[\(info)] 关于议题「\(currentMeeting.topic)」第 \(currentMeeting.round) 轮发言：\n从原生视角考量，Swift + SwiftUI/AppKit 深度贴合 macOS 渲染管线，能将运行时内存与应用体积压缩至极致。"
+                    let speechText = "[\(info) · \(roleLabel)] 关于议题「\(currentMeeting.topic)」第 \(currentMeeting.round) 轮发言：\n从原生视角考量，Swift + SwiftUI/AppKit 深度贴合 macOS 渲染管线，能将运行时内存与应用体积压缩至极致。"
                     let ready = (currentMeeting.round >= 2)
 
                     let claim = Claim(
@@ -50,7 +72,7 @@ public class MeetingCoordinator: ObservableObject {
                         text: "\(info) 核心论据与性能指标分析",
                         kind: "proposal",
                         sources: [currentMeeting.topic],
-                        limitations: "基于当前基准测试事实"
+                        limitations: "针对 Judge 评判标准"
                     )
 
                     let msg = Message(
@@ -69,8 +91,8 @@ public class MeetingCoordinator: ObservableObject {
                 }
 
                 // Check termination condition
-                let recentMessages = currentMeeting.messages.suffix(currentMeeting.participants.count)
-                let allReady = currentMeeting.participants.allSatisfy { p in
+                let recentMessages = currentMeeting.messages.suffix(activeSpeakers.count)
+                let allReady = activeSpeakers.allSatisfy { p in
                     recentMessages.contains(where: { $0.author == p && $0.readyToConclude })
                 }
 
