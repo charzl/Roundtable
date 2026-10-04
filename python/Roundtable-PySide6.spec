@@ -2,7 +2,7 @@
 
 
 a = Analysis(
-    ['/Users/charlie/orca/workspaces/Roundtable/emperor/alternatives/pyside6/main.py'],
+    ['main.py'],
     pathex=[],
     binaries=[],
     datas=[],

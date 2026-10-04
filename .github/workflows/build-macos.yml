@@ -30,48 +30,66 @@ jobs:
       - name: Check out repository
         uses: actions/checkout@v4
 
-      - name: Set up Node.js
+      - name: Set up Node.js 22
         uses: actions/setup-node@v4
         with:
           node-version: 22
           cache: 'npm'
           cache-dependency-path: 'javascript/package-lock.json'
 
-      - name: Install dependencies
-        run: npm --prefix javascript ci
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+          cache-dependency-path: 'python/requirements.txt'
+
+      - name: Install dependencies (JavaScript & Python)
+        run: |
+          npm --prefix javascript ci
+          pip install -r python/requirements.txt
 
       - name: Run syntax checks
-        run: npm run check
+        run: |
+          npm run check
+          python3 -m py_compile python/*.py
 
-      - name: Run automated test suite
-        run: npm test
+      - name: Run automated test suites (JavaScript & Python)
+        run: |
+          npm test
+          python3 -m unittest discover -s python/tests -p "test_*.py"
 
-      - name: Package macOS application (ARM64 DMG & ZIP)
-        run: npm run package:mac
+      - name: Package all 3 stacks (JavaScript, Python, Swift)
+        run: node package-all.js
 
       - name: Run post-packaging verification tests
         run: npm --prefix javascript test javascript/tests/package.test.js
 
       - name: Verify package artifacts
         run: |
-          DIST_DIR=$([ -d "javascript/dist" ] && echo "javascript/dist" || echo "dist")
-          ls -lh $DIST_DIR/Roundtable-*-mac-arm64.*
-          cat $DIST_DIR/Roundtable-*-mac-arm64.sha256
+          ls -lh dist/
+          cat dist/checksums.sha256
+
+      - name: Generate GitHub Step Summary
+        if: always()
+        run: |
+          echo "## 📦 macOS ARM64 Multi-Stack Packaging Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| Artifact File | Size | SHA256 (Prefix) |" >> $GITHUB_STEP_SUMMARY
+          echo "| :--- | :--- | :--- |" >> $GITHUB_STEP_SUMMARY
+          awk '{print "| `" $2 "` | - | `" substr($1,1,12) "...` |"}' dist/checksums.sha256 >> $GITHUB_STEP_SUMMARY
 
       - name: Upload macOS ARM64 artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: Roundtable-macOS-ARM64
+          name: Roundtable-macOS-ARM64-All-Stacks
           path: |
-            javascript/dist/Roundtable-*-mac-arm64.dmg
-            javascript/dist/Roundtable-*-mac-arm64.zip
-            javascript/dist/Roundtable-*-mac-arm64.sha256
-            javascript/dist/artifacts-manifest.json
-            dist/Roundtable-*-mac-arm64.dmg
-            dist/Roundtable-*-mac-arm64.zip
-            dist/Roundtable-*-mac-arm64.sha256
+            dist/Roundtable-*.dmg
+            dist/Roundtable-*.zip
+            dist/Roundtable-*.sha256
+            dist/checksums.sha256
             dist/artifacts-manifest.json
-          if-no-files-found: ignore
+          if-no-files-found: error
 
   release:
     name: Publish GitHub Release
@@ -85,7 +103,7 @@ jobs:
       - name: Download all built packages
         uses: actions/download-artifact@v4
         with:
-          name: roundtable-mac-arm64
+          name: Roundtable-macOS-ARM64-All-Stacks
           path: release-packages
 
       - name: Display downloaded packages
