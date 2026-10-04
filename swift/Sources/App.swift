@@ -1,16 +1,49 @@
 import SwiftUI
 
-// Exact palette from javascript/ui/style.css
+#if canImport(AppKit)
+import AppKit
+
 extension Color {
-    static let rtBg = Color(red: 245/255, green: 245/255, blue: 240/255) // #f5f5f0
-    static let rtPanel = Color.white // #ffffff
-    static let rtInk = Color(red: 37/255, green: 55/255, blue: 47/255) // #25372f
-    static let rtMuted = Color(red: 106/255, green: 120/255, blue: 111/255) // #6a786f
-    static let rtLine = Color(red: 220/255, green: 227/255, blue: 218/255) // #dce3da
-    static let rtSoft = Color(red: 237/255, green: 241/255, blue: 233/255) // #edf1e9
-    static let rtAccent = Color(red: 52/255, green: 93/255, blue: 70/255) // #345d46
-    static let rtAccentHover = Color(red: 38/255, green: 75/255, blue: 54/255) // #264b36
+    private static func dynamic(light: NSColor, dark: NSColor) -> Color {
+        Color(nsColor: NSColor(name: nil, dynamicProvider: { appearance in
+            appearance.bestMatch(from: [.darkAqua, .aqua]) == .darkAqua ? dark : light
+        }))
+    }
+
+    static let rtBg = dynamic(
+        light: NSColor(red: 245/255, green: 245/255, blue: 240/255, alpha: 1.0), // #f5f5f0
+        dark: NSColor(red: 20/255, green: 26/255, blue: 23/255, alpha: 1.0)       // #141a17
+    )
+    static let rtPanel = dynamic(
+        light: NSColor.white,                                                    // #ffffff
+        dark: NSColor(red: 28/255, green: 36/255, blue: 32/255, alpha: 1.0)       // #1c2420
+    )
+    static let rtInk = dynamic(
+        light: NSColor(red: 37/255, green: 55/255, blue: 47/255, alpha: 1.0),   // #25372f
+        dark: NSColor(red: 229/255, green: 234/255, blue: 231/255, alpha: 1.0)  // #e5eae7
+    )
+    static let rtMuted = dynamic(
+        light: NSColor(red: 106/255, green: 120/255, blue: 111/255, alpha: 1.0), // #6a786f
+        dark: NSColor(red: 142/255, green: 158/255, blue: 149/255, alpha: 1.0)   // #8e9e95
+    )
+    static let rtLine = dynamic(
+        light: NSColor(red: 220/255, green: 227/255, blue: 218/255, alpha: 1.0), // #dce3da
+        dark: NSColor(red: 45/255, green: 59/255, blue: 51/255, alpha: 1.0)       // #2d3b33
+    )
+    static let rtSoft = dynamic(
+        light: NSColor(red: 237/255, green: 241/255, blue: 233/255, alpha: 1.0), // #edf1e9
+        dark: NSColor(red: 34/255, green: 44/255, blue: 39/255, alpha: 1.0)       // #222c27
+    )
+    static let rtAccent = dynamic(
+        light: NSColor(red: 52/255, green: 93/255, blue: 70/255, alpha: 1.0),   // #345d46
+        dark: NSColor(red: 62/255, green: 161/255, blue: 104/255, alpha: 1.0)   // #3ea168
+    )
+    static let rtAccentHover = dynamic(
+        light: NSColor(red: 38/255, green: 75/255, blue: 54/255, alpha: 1.0),   // #264b36
+        dark: NSColor(red: 77/255, green: 187/255, blue: 123/255, alpha: 1.0)   // #4dbb7b
+    )
 }
+#endif
 
 @main
 struct RoundtableSwiftApp: App {

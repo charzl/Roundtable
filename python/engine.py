@@ -33,24 +33,49 @@ class ProviderRunner:
         return None
 
     @classmethod
+    def run_organizer_kickoff(cls, organizer: str, meeting: Meeting) -> Message:
+        org_info = PARTICIPANTS_INFO.get(organizer, {'name': organizer})
+        leader_info = PARTICIPANTS_INFO.get(meeting.leader, {'name': meeting.leader})
+        msg_id = f"M-{meeting.round:02d}-00-kickoff"
+        text = (
+            f"[{org_info['name']} · 组织者] 圆桌会议正式开始。\n"
+            f"本次会议由 Judge (人类裁决者) 设定议题：「{meeting.topic}」，并由 Judge 主导后续追问与最终裁决。\n"
+            f"本场讨论由负责人 {leader_info['name']} 牵头，请各位圆桌成员专注方案权衡展开论证。"
+        )
+        return Message(
+            id=msg_id,
+            author=organizer,
+            text=text,
+            round=meeting.round,
+            ready_to_conclude=False,
+            claims=[
+                {
+                    "id": f"C-kickoff-01",
+                    "text": f"组织者 {org_info['name']} 确立的议程与探讨基准",
+                    "kind": "agenda",
+                    "sources": [meeting.topic],
+                    "limitations": "由 Judge 设定初始目标"
+                }
+            ]
+        )
+
+    @classmethod
     def run_turn(cls, participant: str, meeting: Meeting) -> Message:
         exe = cls.resolve_executable(participant)
         msg_id = f"M-{meeting.round:02d}-{len(meeting.messages) + 1:02d}"
         info = PARTICIPANTS_INFO.get(participant, {'name': participant})
-        
-        # Real invocation if available and requested, otherwise high-fidelity simulated response
-        if exe:
-            try:
-                # We can call real CLI, with safe prompt
-                prompt = f"Roundtable meeting on: {meeting.topic}\nYour role: {info['name']}"
-                # If needed, subprocess.run([exe, ...])
-            except Exception:
-                pass
+        role_label = meeting.get_role_label(participant)
 
-        # Consistent domain statement matching Roundtable discussion rules
+        # Check for latest Judge inquiry (without quoting human as a peer provider)
+        judge_messages = [m for m in meeting.messages if m.get('author') == 'human']
+        judge_context = ""
+        if judge_messages:
+            latest_judge = judge_messages[-1]['text']
+            judge_context = f"\n响应 Judge 提出的指导要求：「{latest_judge[:60]}...」"
+
         text = (
-            f"[{info['name']}] 关于议题「{meeting.topic}」第 {meeting.round} 轮发言：\n"
-            f"结合当前上下文，我建议重点考量实现效率、跨平台资源消耗与工程可维护性。"
+            f"[{info['name']} · {role_label}] 关于议题「{meeting.topic}」第 {meeting.round} 轮发言：\n"
+            f"结合当前上下文，我建议重点考量实现效率、跨平台资源消耗与工程可维护性。{judge_context}"
         )
         ready = (meeting.round >= 2)
         
@@ -66,7 +91,7 @@ class ProviderRunner:
                     "text": f"{info['name']} 提出的关键论点与方案权衡",
                     "kind": "proposal",
                     "sources": [meeting.topic],
-                    "limitations": "基于当前会话事实"
+                    "limitations": "针对 Judge 评判标准展开"
                 }
             ]
         )
@@ -98,13 +123,34 @@ class MeetingWorker(QThread):
     def run(self):
         self.status_changed.emit("会议进行中 / Meeting in progress")
         
+        # Round 1 standalone organizer kickoff for 4+ participants
+        if self.meeting.round == 1 and len(self.meeting.participants) >= 4 and not self.meeting.messages:
+            self.turn_started.emit(self.meeting.organizer, 1)
+            self.msleep(300)
+            kickoff_msg = ProviderRunner.run_organizer_kickoff(self.meeting.organizer, self.meeting)
+            k_dict = {
+                'id': kickoff_msg.id,
+                'author': kickoff_msg.author,
+                'text': kickoff_msg.text,
+                'round': kickoff_msg.round,
+                'timestamp': kickoff_msg.timestamp,
+                'origin': kickoff_msg.origin,
+                'ready_to_conclude': kickoff_msg.ready_to_conclude,
+                'claims': kickoff_msg.claims
+            }
+            self.meeting.messages.append(k_dict)
+            self.turn_finished.emit(k_dict)
+            self.msleep(300)
+
         while self._is_running and self.meeting.round <= self.meeting.max_rounds:
             if self._is_paused:
                 self.msleep(200)
                 continue
 
+            active_speakers = self.meeting.get_active_speakers()
+
             # Determine who speaks next in this round
-            for p in self.meeting.participants:
+            for p in active_speakers:
                 if not self._is_running:
                     break
                 while self._is_paused and self._is_running:
@@ -130,10 +176,10 @@ class MeetingWorker(QThread):
                 self.turn_finished.emit(msg_dict)
                 self.msleep(300)
 
-            # Check if all participants are ready to conclude or reached max rounds
+            # Check if all active speakers are ready to conclude or reached max rounds
             all_ready = all(
-                any(m['author'] == p and m.get('ready_to_conclude') for m in self.meeting.messages[-len(self.meeting.participants):])
-                for p in self.meeting.participants
+                any(m['author'] == p and m.get('ready_to_conclude') for m in self.meeting.messages[-len(active_speakers):])
+                for p in active_speakers
             )
 
             if all_ready or self.meeting.round >= self.meeting.max_rounds:

@@ -78,7 +78,7 @@ public struct SidebarView: View {
                     .foregroundColor(.rtInk)
                     .padding(.horizontal, 16)
 
-                // Human
+                // Judge (Human)
                 HStack(spacing: 10) {
                     Circle()
                         .stroke(Color.rtAccent, lineWidth: 1)
@@ -91,12 +91,12 @@ public struct SidebarView: View {
                         )
 
                     VStack(alignment: .leading, spacing: 1) {
-                        Text("你")
+                        Text("你 (Judge)")
                             .font(.system(size: 12, weight: .semibold))
                             .foregroundColor(.rtInk)
-                        Text("会议发起人")
+                        Text("裁决者 · 提问与裁定")
                             .font(.system(size: 10))
-                            .foregroundColor(.rtMuted)
+                            .foregroundColor(.rtAccent)
                     }
                 }
                 .padding(.horizontal, 16)
@@ -108,7 +108,7 @@ public struct SidebarView: View {
                     HStack(spacing: 10) {
                         Circle()
                             .stroke(Color.rtLine, lineWidth: 1)
-                            .background(Circle().fill(Color.white))
+                            .background(Circle().fill(Color.rtPanel))
                             .frame(width: 28, height: 28)
                             .overlay(
                                 Text(String((info?.name ?? p).prefix(2)))
@@ -120,7 +120,7 @@ public struct SidebarView: View {
                             Text(info?.name ?? p)
                                 .font(.system(size: 12, weight: .semibold))
                                 .foregroundColor(.rtInk)
-                            Text(isLeader(p) ? "Leader · 会议负责人" : "等待发言")
+                            Text(roleLabel(p))
                                 .font(.system(size: 10))
                                 .foregroundColor(.rtMuted)
                         }
@@ -139,13 +139,13 @@ public struct SidebarView: View {
         if let id = selectedMeetingId, let m = store.meetings.first(where: { $0.id == id }) {
             return m.participants
         }
-        return ["codex", "claude", "agy", "cursor"]
+        return ["claude", "codex", "agy", "cursor"]
     }
 
-    private func isLeader(_ id: String) -> Bool {
+    private func roleLabel(_ id: String) -> String {
         if let mId = selectedMeetingId, let m = store.meetings.first(where: { $0.id == mId }) {
-            return m.leader == id
+            return m.getRoleLabel(participantId: id)
         }
-        return id == "codex"
+        return "Member / 组员"
     }
 }

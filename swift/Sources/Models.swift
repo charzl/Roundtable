@@ -63,6 +63,7 @@ public struct Meeting: Codable, Identifiable, Hashable {
     public var topic: String
     public var participants: [String]
     public var mode: String
+    public var organizer: String
     public var leader: String
     public var maxRounds: Int
     public var round: Int
@@ -72,11 +73,12 @@ public struct Meeting: Codable, Identifiable, Hashable {
     public var decision: Decision?
     public var userDecision: String?
 
-    public init(id: String, topic: String, participants: [String], mode: String = "discussion", leader: String = "claude", maxRounds: Int = 10, round: Int = 1, status: String = "active", createdAt: String = ISO8601DateFormatter().string(from: Date()), messages: [Message] = [], decision: Decision? = nil, userDecision: String? = nil) {
+    public init(id: String, topic: String, participants: [String], mode: String = "discussion", organizer: String = "claude", leader: String = "codex", maxRounds: Int = 10, round: Int = 1, status: String = "active", createdAt: String = ISO8601DateFormatter().string(from: Date()), messages: [Message] = [], decision: Decision? = nil, userDecision: String? = nil) {
         self.id = id
         self.topic = topic
         self.participants = participants
         self.mode = mode
+        self.organizer = organizer
         self.leader = leader
         self.maxRounds = maxRounds
         self.round = round
@@ -85,6 +87,52 @@ public struct Meeting: Codable, Identifiable, Hashable {
         self.messages = messages
         self.decision = decision
         self.userDecision = userDecision
+    }
+
+    public func getActiveSpeakers() -> [String] {
+        if participants.count <= 3 {
+            return participants
+        } else {
+            return participants.filter { $0 != organizer }
+        }
+    }
+
+    public func getRoleLabel(participantId: String) -> String {
+        if participantId == "human" {
+            return "Judge / 裁决者"
+        }
+        if participantId == organizer {
+            if participants.count <= 3 {
+                return "Organizer & Member / 主持兼成员"
+            } else {
+                return "Organizer / 独立主持人"
+            }
+        }
+        if participantId == leader {
+            return "Leader / 负责人"
+        }
+        return "Member / 组员"
+    }
+
+    enum CodingKeys: String, CodingKey {
+        case id, topic, participants, mode, organizer, leader, maxRounds, round, status, createdAt, messages, decision, userDecision
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        id = try container.decode(String.self, forKey: .id)
+        topic = try container.decode(String.self, forKey: .topic)
+        participants = try container.decode([String].self, forKey: .participants)
+        mode = try container.decodeIfPresent(String.self, forKey: .mode) ?? "discussion"
+        leader = try container.decodeIfPresent(String.self, forKey: .leader) ?? "codex"
+        organizer = try container.decodeIfPresent(String.self, forKey: .organizer) ?? leader
+        maxRounds = try container.decodeIfPresent(Int.self, forKey: .maxRounds) ?? 10
+        round = try container.decodeIfPresent(Int.self, forKey: .round) ?? 1
+        status = try container.decodeIfPresent(String.self, forKey: .status) ?? "active"
+        createdAt = try container.decodeIfPresent(String.self, forKey: .createdAt) ?? ISO8601DateFormatter().string(from: Date())
+        messages = try container.decodeIfPresent([Message].self, forKey: .messages) ?? []
+        decision = try container.decodeIfPresent(Decision.self, forKey: .decision)
+        userDecision = try container.decodeIfPresent(String.self, forKey: .userDecision)
     }
 }
 

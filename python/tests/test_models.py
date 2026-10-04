@@ -77,5 +77,39 @@ class TestModels(unittest.TestCase):
         self.assertEqual(d.author, "codex")
         self.assertIn("Electron 废弃时机", d.disagreements)
 
+    def test_role_dynamics_and_judge_semantics(self):
+        # 3 AI roles: Organizer also participates in discussion
+        m3 = Meeting(
+            id="M-3ROLES",
+            topic="3 AI 规格测试",
+            participants=['claude', 'codex', 'agy'],
+            organizer='claude',
+            leader='codex'
+        )
+        self.assertEqual(m3.get_role_label('human'), "Judge / 裁决者")
+        self.assertEqual(m3.get_role_label('claude'), "Organizer & Member / 主持兼成员")
+        self.assertEqual(m3.get_role_label('codex'), "Leader / 负责人")
+        self.assertEqual(m3.get_role_label('agy'), "Member / 组员")
+        speakers_3 = m3.get_active_speakers()
+        self.assertEqual(len(speakers_3), 3)
+        self.assertIn('claude', speakers_3)
+
+        # 4+ AI roles: Organizer is standalone host, remaining 3+ discuss
+        m4 = Meeting(
+            id="M-4ROLES",
+            topic="4 AI 规格测试",
+            participants=['claude', 'codex', 'agy', 'cursor'],
+            organizer='claude',
+            leader='codex'
+        )
+        self.assertEqual(m4.get_role_label('claude'), "Organizer / 独立主持人")
+        self.assertEqual(m4.get_role_label('codex'), "Leader / 负责人")
+        speakers_4 = m4.get_active_speakers()
+        self.assertEqual(len(speakers_4), 3)
+        self.assertNotIn('claude', speakers_4)
+        self.assertIn('codex', speakers_4)
+        self.assertIn('agy', speakers_4)
+        self.assertIn('cursor', speakers_4)
+
 if __name__ == '__main__':
     unittest.main()
