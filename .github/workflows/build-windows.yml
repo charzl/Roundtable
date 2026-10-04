@@ -1,0 +1,108 @@
+name: Build Windows Packages
+
+on:
+  push:
+    branches:
+      - main
+      - 'charzl/**'
+    tags:
+      - 'v*'
+  pull_request:
+    branches:
+      - main
+  workflow_dispatch:
+    inputs:
+      create_release:
+        description: 'Create a GitHub Release with built packages'
+        required: false
+        type: boolean
+        default: false
+
+permissions:
+  contents: write
+
+jobs:
+  build-windows-x64:
+    name: Build Windows x64 (Python & PySide6)
+    runs-on: windows-latest
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+          cache-dependency-path: 'python/requirements.txt'
+
+      - name: Install Python dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r python/requirements.txt
+
+      - name: Run Python Unit Tests
+        run: python -m unittest discover -s python/tests -p "test_*.py" -v
+
+      - name: "Package Python Native for Windows"
+        run: python python/package.py
+
+      - name: Verify package artifacts
+        shell: bash
+        run: |
+          ls -lh python/dist/
+          cat python/dist/*.sha256
+
+      - name: Generate GitHub Step Summary
+        if: always()
+        shell: bash
+        run: |
+          echo "## 🪟 Windows x64 Application Packaging Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### 🌟 主力 Windows 原生独立客户端 / Primary Windows Production Stack" >> $GITHUB_STEP_SUMMARY
+          echo "- **Python Native (PySide6 / Qt 6)**: 跨平台便携独立绿色包 (~28 MB)，无需安装 Python，解压即用" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### 📦 已生成分发产物列表 / Generated Distribution Artifacts" >> $GITHUB_STEP_SUMMARY
+          echo "| 产物类型 | 文件名 | SHA256 (Prefix) |" >> $GITHUB_STEP_SUMMARY
+          echo "| :--- | :--- | :--- |" >> $GITHUB_STEP_SUMMARY
+          awk '{print "| Windows 软件包 | `" $2 "` | `" substr($1,1,12) "...` |"}' python/dist/*.sha256 >> $GITHUB_STEP_SUMMARY
+
+      - name: Upload Windows artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: Roundtable-Windows-x64-Packages
+          path: |
+            python/dist/Roundtable-PySide6-*.zip
+            python/dist/Roundtable-PySide6-*.sha256
+          if-no-files-found: error
+
+  release:
+    name: Publish GitHub Release
+    needs: [build-windows-x64]
+    if: startsWith(github.ref, 'refs/tags/v') || (github.event_name == 'workflow_dispatch' && inputs.create_release == true)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Download Windows packages
+        uses: actions/download-artifact@v4
+        with:
+          name: Roundtable-Windows-x64-Packages
+          path: release-packages
+
+      - name: Display downloaded packages
+        run: |
+          echo "Release artifacts:"
+          ls -lh release-packages/
+
+      - name: Create or update GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: release-packages/*
+          generate_release_notes: true
+          draft: false
+          prerelease: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
