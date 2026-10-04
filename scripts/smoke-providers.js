@@ -5,7 +5,7 @@ import { Store } from '../src/service/store.js';
 import { runCli } from '../src/providers/cli.js';
 const root=resolve('output/verification/provider-probes'), caps=new Capabilities(resolve('.roundtable/shared'));
 mkdirSync(root,{recursive:true});
-const ids=process.argv.slice(2).length?process.argv.slice(2):['codex','claude','agy'];
+const ids=process.argv.slice(2).length?process.argv.slice(2):['codex','claude','agy','cursor'];
 for(const id of ids){
   const dir=resolve(root,id),callDir=resolve(dir,'probe'),workspace=resolve(dir,'workspace');mkdirSync(workspace,{recursive:true});
   writeFileSync(resolve(dir,'meeting.json'),JSON.stringify({messages:[{id:'M-001',author:'human',text:'接入验证：确认你能读取当前会议记录。',claims:[]}]}));

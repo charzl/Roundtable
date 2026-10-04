@@ -2,7 +2,8 @@
 
 让人和多个真实 AI agent 在同一场会议里提问、回应、核查和反驳，形成有依据、保留异议的决策稿。
 
-当前 0.2.2 版是运行在 Mac mini 上的 macOS 桌面应用：Electron 界面 + 独立本地会议服务 + Codex / Claude / AGY CLI 适配器。后续手机 App 可接入会议服务；本版尚无手机 App 或远程接入。
+当前 0.2.2 版是运行在 Mac mini 上的 macOS 桌面应用：Electron 界面 + 独立本地会议服务 + Codex / Claude / AGY / Cursor CLI 适配器。后续手机 App 可接入会议服务；本版尚无手机 App 或远程接入。  
+Version 0.2.2 is a macOS desktop app running on Mac mini: Electron interface + standalone local meeting daemon + Codex / Claude / AGY / Cursor CLI adapters. Mobile apps will connect to the meeting daemon in future releases; no mobile app or remote connection is included in this release.
 
 ## 本地使用
 
@@ -49,11 +50,14 @@ The project includes a GitHub Actions workflow (`.github/workflows/build-macos.y
 
 ## 共享能力与数据
 
-「共享能力」维护一份 MCP 配置。0.2.2 已合并本机 Codex、Claude、AGY 的既有定义：Broadcom、小红书、Robinhood、node_repl、computer-use，去重保留来源及原禁用状态。重新导入用 `npm run import:mcp`（需 Python 3.11+）；导入不等于账号或所有工具已接通。实际状态见 [MCP 合并验收](docs/mcp-import-verification.md)。Codex / Claude 接收适配后的同一份配置；共同 skill 内容随提示词提供并记录版本哈希。内置 MCP 支持会议记录、共享研究与观点核查。
+「共享能力」维护一份 MCP 配置。0.2.2 已合并本机 Codex、Claude、AGY 与 Cursor 的既有定义（检索路径含 `~/.cursor/mcp.json` 与 `.cursor/mcp.json`）：Broadcom、小红书、Robinhood、node_repl、computer-use，去重保留来源及原禁用状态。重新导入用 `npm run import:mcp`（需 Python 3.11+）；导入不等于账号或所有工具已接通。实际状态见 [MCP 合并验收](docs/mcp-import-verification.md)。Codex / Claude / Cursor 接收适配后的配置；共同 skill 内容随提示词提供并记录版本哈希。内置 MCP 支持会议记录、共享研究与观点核查。  
+The "Shared Capabilities" module maintains a unified MCP configuration. Version 0.2.2 merges existing MCP definitions across Codex, Claude, AGY, and Cursor (searching paths including `~/.cursor/mcp.json` and `.cursor/mcp.json`): Broadcom, Xiaohongshu, Robinhood, node_repl, and computer-use, deduplicating configs while preserving provenance and original disabled status. Re-import via `npm run import:mcp` (requires Python 3.11+).
 
 桌面应用（`npm start` 和打包 `.app`）统一保存到 `~/Library/Application Support/Roundtable/data/`，窗口偏好位于其旁边的 `electron-profile/`。文件不放在安装包内。旧目录的会议以复制方式迁移，冲突版本另行保留；更新打包前也检查旧包内数据。共享 MCP 与 skills 位于数据目录的 `shared/`。每场会议固定创建时的配置和规范版本；修改用于之后新建的会议。单独运行 `npm run serve` 仍默认使用仓库 `.roundtable/`；也可用 `ROUNDTABLE_DATA_DIR` 指定目录。当前使用 JSON 文件，尚未迁移 SQLite。
 
-Codex、Claude、AGY 均可参加共同讨论和独立调查。按用户当前选择，优先取得 AGY 的意见：AGY 直接分析提示词提供的会议材料，项目共享 MCP 适配仍待完善，其全局工具尚未按调用隔离。Codex / Claude 的独立阶段仅传入内置会议 MCP，暂不接入外部共享 MCP；Mac 文件限制仍保护本项目数据目录，远程共享工具及运行时缓存不在这项文件限制范围。公开讨论可使用统一配置的外部工具，但其连接与权限需逐项验证。更多语言通过 `ui/locales/manifest.json` 和对应资源加入，原文不自动翻译。
+Codex、Claude、AGY、Cursor 均可参加共同讨论和独立调查。Cursor 运行时通过本地 `cursor-agent`（或 `cursor agent`）CLI 接入，并自动挂载工作区 `.cursor/mcp.json`；调用真实模型需要完成 `agent login` 或提供 `CURSOR_API_KEY`。按用户当前选择，优先取得 AGY 的意见：AGY 直接分析提示词提供的会议材料，项目共享 MCP 适配仍待完善，其全局工具尚未按调用隔离。Codex / Claude 的独立阶段仅传入内置会议 MCP，暂不接入外部共享 MCP；Mac 文件限制仍保护本项目数据目录，远程共享工具及运行时缓存不在这项文件限制范围。公开讨论可使用统一配置的外部工具，但其连接与权限需逐项验证。更多语言通过 `ui/locales/manifest.json` 和对应资源加入，原文不自动翻译。  
+Codex, Claude, AGY, and Cursor can all participate in joint discussions and independent investigations. Cursor runs through the local `cursor-agent` (or `cursor agent`) CLI and mounts scoped `.cursor/mcp.json` per workspace invocation; real model execution requires `agent login` or `CURSOR_API_KEY`.
+
 
 ## 检查
 

@@ -1,5 +1,5 @@
 import { spawn } from 'node:child_process';
-import { existsSync, writeFileSync, appendFileSync, mkdirSync } from 'node:fs';
+import { existsSync, writeFileSync, appendFileSync, mkdirSync, copyFileSync } from 'node:fs';
 import { delimiter, join, dirname } from 'node:path';
 import { createHash } from 'node:crypto';
 import { parseEvents } from './events.js';
@@ -10,16 +10,23 @@ export const PROVIDERS = [
   { id: 'codex', name: 'Codex', provider: 'OpenAI', sharedMcp: true },
   { id: 'claude', name: 'Claude', provider: 'Anthropic', sharedMcp: true },
   { id: 'agy', name: 'Antigravity', provider: '运行时默认模型（待输出确认）', sharedMcp: false },
+  { id: 'cursor', name: 'Cursor', provider: 'Anysphere', sharedMcp: true },
 ];
 export function resolveExecutable(name, env = process.env) {
   if (name.includes('/')) return existsSync(name) ? name : null;
-  return (env.PATH || '').split(delimiter).map(p => join(p, name)).find(existsSync) || null;
+  const candidates = name === 'cursor' ? ['cursor-agent', 'agent', 'cursor'] : [name];
+  const paths = (env.PATH || '').split(delimiter);
+  for (const c of candidates) {
+    const found = paths.map(p => join(p, c)).find(existsSync);
+    if (found) return found;
+  }
+  return null;
 }
 export function inventory() {
   return PROVIDERS.map(p => ({ ...p, executable: resolveExecutable(p.id), status: resolveExecutable(p.id) ? 'installed' : 'missing', independent: isolationAvailable(), scopedMcp: p.id !== 'agy' }));
 }
 export function safeEnvironment() {
-  const allowed = ['PATH', 'HOME', 'USER', 'LOGNAME', 'SHELL', 'TMPDIR', 'LANG', 'LC_ALL', 'CODEX_HOME', 'OPENAI_API_KEY', 'ANTHROPIC_API_KEY', 'CLAUDE_CODE_OAUTH_TOKEN'];
+  const allowed = ['PATH', 'HOME', 'USER', 'LOGNAME', 'SHELL', 'TMPDIR', 'LANG', 'LC_ALL', 'CODEX_HOME', 'OPENAI_API_KEY', 'ANTHROPIC_API_KEY', 'CLAUDE_CODE_OAUTH_TOKEN', 'CURSOR_API_KEY', 'CURSOR_DATA_DIR'];
   return Object.fromEntries(allowed.filter(k => process.env[k] !== undefined).map(k => [k, process.env[k]]));
 }
 const toml = v => JSON.stringify(v);
@@ -52,6 +59,26 @@ export function buildInvocation(id, { prompt, workspace, mcpFile, mcpServers, no
     const args = ['--print', prompt, '--output-format', 'stream-json', '--mode', 'plan', '--sandbox', '--print-timeout', `${Math.ceil(timeoutMs/1000)}s`];
     if (model) args.push('--model', model);
     return { command: 'agy', args, stdin: '' };
+  }
+  if (id === 'cursor') {
+    const bin = resolveExecutable('cursor');
+    const isApp = bin && (bin.endsWith('/cursor') || bin.endsWith('/cursor.exe'));
+    const command = bin ? (isApp ? 'cursor' : 'cursor-agent') : 'cursor-agent';
+    const args = isApp ? ['agent'] : [];
+    args.push('--print', prompt, '--output-format', 'stream-json', '--mode', 'plan', '--trust');
+    if (workspace) {
+      args.push('--workspace', workspace);
+      if (mcpFile && existsSync(mcpFile)) {
+        try {
+          const dotCursor = join(workspace, '.cursor');
+          mkdirSync(dotCursor, { recursive: true, mode: 0o700 });
+          copyFileSync(mcpFile, join(dotCursor, 'mcp.json'));
+        } catch {}
+      }
+    }
+    if (model) args.push('--model', model);
+    if (mcpFile) args.push('--approve-mcps');
+    return { command, args, stdin: '' };
   }
   throw new Error('未知参会者');
 }
