@@ -59,3 +59,14 @@ This document explains the GitHub Rulesets configured for the Roundtable reposit
   - 中文：当 Pull Request 合并进入主分支（`main`）后，GitHub 会自动删除已合并的源功能分支（Head branch），避免远程积累陈旧分支，保持分支树整洁。
   - English: Once a Pull Request is successfully merged into `main`, GitHub automatically deletes the head branch, keeping the remote repository clean from stale feature branches.
 
+---
+
+## 四、CI 协作标签与自动变基 / CI Collaboration Labels & Auto-Rebase
+
+仓库配置了标准化协作标签，并在 GitHub Actions 中集成了基于标签的自动化工作流：
+
+| 标签 (Label) | 色值 (Color) | 说明 (Description) | 自动化联动 (Automation Behavior) |
+|---|---|---|---|
+| `rebase` | `#fbca04` | Require branch rebase onto main / 标记需要变基同步 | **自动变基触发器**：给 PR 打上此标签（或在 PR 评论 `/rebase`）即可触发 `.github/workflows/rebase.yml`，在云端将 PR 分支自动变基并强制更新，完成后自动移除标签并留言反馈。 |
+| `run_smoke` | `#d93f0b` | Trigger or require desktop smoke tests / 运行桌面端冒烟测试 | **冒烟测试门禁**：用于按需触发或标记需执行桌面端完整启动与冒烟测试验证。 |
+| `run_all_tests` | `#0e8a16` | Trigger or require full comprehensive test suite / 运行全量完整测试 | **全量测试触发**：用于按需触发跨平台全矩阵测试与耗时回归测试。 |

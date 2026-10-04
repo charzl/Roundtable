@@ -1,0 +1,75 @@
+name: Auto Rebase
+
+on:
+  pull_request:
+    types: [labeled]
+  issue_comment:
+    types: [created]
+
+permissions:
+  contents: write
+  pull-requests: write
+  issues: write
+
+jobs:
+  rebase:
+    name: Auto Rebase Branch onto Main
+    if: >
+      (github.event_name == 'pull_request' && github.event.label.name == 'rebase') ||
+      (github.event_name == 'issue_comment' && github.event.issue.pull_request && contains(github.event.comment.body, '/rebase'))
+    runs-on: ubuntu-latest
+    steps:
+      - name: Resolve Pull Request Info
+        id: pr_info
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          if [ "${{ github.event_name }}" = "issue_comment" ]; then
+            PR_NUM="${{ github.event.issue.number }}"
+          else
+            PR_NUM="${{ github.event.pull_request.number }}"
+          fi
+          HEAD_REF=$(gh pr view "$PR_NUM" --repo "${{ github.repository }}" --json headRefName -q .headRefName)
+          HEAD_REPO=$(gh pr view "$PR_NUM" --repo "${{ github.repository }}" --json headRepositoryOwner -q .headRepositoryOwner.login)
+          BASE_REF=$(gh pr view "$PR_NUM" --repo "${{ github.repository }}" --json baseRefName -q .baseRefName)
+          echo "pr_number=$PR_NUM" >> $GITHUB_OUTPUT
+          echo "head_ref=$HEAD_REF" >> $GITHUB_OUTPUT
+          echo "head_repo=$HEAD_REPO" >> $GITHUB_OUTPUT
+          echo "base_ref=$BASE_REF" >> $GITHUB_OUTPUT
+
+      - name: Check out repository
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ steps.pr_info.outputs.head_ref }}
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Configure Git Identity
+        run: |
+          git config --global user.name 'github-actions[bot]'
+          git config --global user.email 'github-actions[bot]@users.noreply.github.com'
+
+      - name: Execute Rebase onto Base Branch
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PR_NUM: ${{ steps.pr_info.outputs.pr_number }}
+          HEAD_REF: ${{ steps.pr_info.outputs.head_ref }}
+          BASE_REF: ${{ steps.pr_info.outputs.base_ref }}
+        run: |
+          echo "Fetching latest $BASE_REF..."
+          git fetch origin "$BASE_REF"
+          git checkout -B "$HEAD_REF" "origin/$HEAD_REF"
+
+          echo "Rebasing $HEAD_REF onto origin/$BASE_REF..."
+          if git rebase "origin/$BASE_REF"; then
+            echo "Rebase successful! Pushing changes to origin/$HEAD_REF..."
+            git push --force-with-lease origin "$HEAD_REF"
+            gh pr comment "$PR_NUM" --repo "${{ github.repository }}" --body "✅ **变基成功 / Auto-rebase successful**: 分支 \`$HEAD_REF\` 已成功变基同步至最新的 \`$BASE_REF\` 主干分支。" || true
+            gh pr edit "$PR_NUM" --repo "${{ github.repository }}" --remove-label "rebase" || true
+          else
+            echo "Rebase conflict detected!"
+            git rebase --abort || true
+            gh pr comment "$PR_NUM" --repo "${{ github.repository }}" --body "⚠️ **变基冲突 / Auto-rebase conflict**: 在将分支 \`$HEAD_REF\` 变基到 \`$BASE_REF\` 时检测到代码冲突，请在本地拉取最新主干并手动解决冲突后推送。" || true
+            gh pr edit "$PR_NUM" --repo "${{ github.repository }}" --remove-label "rebase" || true
+            exit 1
+          fi
