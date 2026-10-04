@@ -1,14 +1,28 @@
+# Dependencies & Runtimes
 node_modules/
+**/node_modules/
+.venv/
+**/.venv/
+__pycache__/
+**/__pycache__/
+*.pyc
+
+# Build outputs
 dist/
+**/dist/
+build/
+**/build/
+.build/
+**/.build/
+DerivedData/
+*.egg-info/
+
+# Local data & logs
 .roundtable/
-# Local mockups, upstream research snapshots and verification artifacts.
 output/
+electron-profile/
 .DS_Store
 *.log
 .env
 .env.*
 !.env.example
-.build/
-DerivedData/
-
-electron-profile/

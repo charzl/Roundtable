@@ -1,31 +1,17 @@
 {
-  "name": "roundtable-desktop",
+  "name": "roundtable",
   "version": "0.2.2",
+  "description": "Roundtable (圆桌会议) - Multi-stack architecture: JavaScript, Python, and Swift",
   "private": true,
-  "description": "圆桌会议：本地人类与真实 agent 会议 / Roundtable: Local human and real agent meetings",
-  "license": "Apache-2.0",
-  "type": "module",
-  "main": "src/desktop/main.js",
   "scripts": {
-    "start": "electron .",
-    "serve": "node src/service/cli.js",
-    "test": "node --test tests/*.test.js",
-    "check": "node scripts/check.js",
-    "smoke:providers": "node scripts/smoke-providers.js",
-    "smoke:desktop": "node scripts/smoke-desktop.js",
-    "build:mac": "node scripts/build-mac.js",
-    "package": "node scripts/package.js",
-    "package:mac": "node scripts/package-mac.js",
-    "smoke:meeting": "node scripts/smoke-meeting.js",
-    "smoke:packaged": "node scripts/smoke-desktop.js --packaged",
-    "smoke:independent": "node scripts/smoke-independent.js",
-    "preview:independent": "node scripts/preview-independent.js",
-    "smoke:upgrade": "node scripts/smoke-upgrade.js",
-    "smoke:three-independent": "node scripts/smoke-three-independent.js",
-    "import:mcp": "node scripts/import-mcp.js"
-  },
-  "devDependencies": {
-    "electron": "44.5.1",
-    "playwright": "1.58.2"
+    "start": "npm --prefix javascript start",
+    "serve": "npm --prefix javascript run serve",
+    "test": "npm --prefix javascript test",
+    "check": "npm --prefix javascript run check",
+    "import:mcp": "npm --prefix javascript run import:mcp",
+    "package:mac": "npm --prefix javascript run package:mac",
+    "package:python": "cd python && python3 package.py",
+    "package:swift": "cd swift && bash package.sh",
+    "benchmark": "python3 benchmark.py"
   }
 }

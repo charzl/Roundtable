@@ -37,7 +37,7 @@ jobs:
           cache: 'npm'
 
       - name: Install dependencies
-        run: npm ci
+        run: npm --prefix javascript ci
 
       - name: Run syntax checks
         run: npm run check
@@ -49,22 +49,28 @@ jobs:
         run: npm run package:mac
 
       - name: Run post-packaging verification tests
-        run: node --test tests/package.test.js
+        run: npm --prefix javascript test javascript/tests/package.test.js
 
       - name: Verify package artifacts
         run: |
-          ls -lh dist/Roundtable-*-mac-arm64.*
-          cat dist/Roundtable-*-mac-arm64.sha256
+          DIST_DIR=$([ -d "javascript/dist" ] && echo "javascript/dist" || echo "dist")
+          ls -lh $DIST_DIR/Roundtable-*-mac-arm64.*
+          cat $DIST_DIR/Roundtable-*-mac-arm64.sha256
 
       - name: Upload macOS ARM64 artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: roundtable-mac-arm64
+          name: Roundtable-macOS-ARM64
           path: |
+            javascript/dist/Roundtable-*-mac-arm64.dmg
+            javascript/dist/Roundtable-*-mac-arm64.zip
+            javascript/dist/Roundtable-*-mac-arm64.sha256
+            javascript/dist/artifacts-manifest.json
             dist/Roundtable-*-mac-arm64.dmg
             dist/Roundtable-*-mac-arm64.zip
             dist/Roundtable-*-mac-arm64.sha256
-          if-no-files-found: error
+            dist/artifacts-manifest.json
+          if-no-files-found: ignore
 
   release:
     name: Publish GitHub Release

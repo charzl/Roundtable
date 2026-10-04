@@ -5,8 +5,20 @@ Meeting coordination engine and provider runner for PySide6 Roundtable.
 import json
 import shutil
 import subprocess
-from typing import Callable, Optional
-from PySide6.QtCore import QObject, Signal, QThread
+try:
+    from PySide6.QtCore import QObject, Signal, QThread
+except ImportError:
+    class QObject:
+        def __init__(self, parent=None): pass
+    class QThread:
+        def __init__(self, parent=None): pass
+        def start(self): pass
+        def msleep(self, ms): pass
+    def Signal(*args, **kwargs):
+        class DummySignal:
+            def emit(self, *a, **k): pass
+            def connect(self, fn): pass
+        return DummySignal()
 from models import Meeting, Message, Decision, PARTICIPANTS_INFO
 
 class ProviderRunner:

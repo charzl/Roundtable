@@ -1,0 +1,18 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "roundtable"
+version = "0.2.2"
+description = "Roundtable (圆桌会议) - Multi-Agent Meeting Assistant (Python + PySide6)"
+readme = "README.md"
+requires-python = ">=3.10"
+license = {text = "Apache-2.0"}
+authors = [{name = "Charlie", email = "charzl@users.noreply.github.com"}]
+dependencies = [
+    "PySide6-Essentials>=6.6.0",
+]
+
+[project.scripts]
+roundtable = "main:main"
