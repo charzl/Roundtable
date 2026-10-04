@@ -1,8 +1,10 @@
 import { spawn } from 'node:child_process';
-import { existsSync, writeFileSync, mkdirSync } from 'node:fs';
+import { existsSync, writeFileSync, appendFileSync, mkdirSync } from 'node:fs';
 import { delimiter, join, dirname } from 'node:path';
 import { createHash } from 'node:crypto';
 import { parseEvents } from './events.js';
+import { isolateInvocation, isolationAvailable } from './isolation.js';
+import { outputSchema } from './schemas.js';
 
 export const PROVIDERS = [
   { id: 'codex', name: 'Codex', provider: 'OpenAI', sharedMcp: true },
@@ -14,17 +16,18 @@ export function resolveExecutable(name, env = process.env) {
   return (env.PATH || '').split(delimiter).map(p => join(p, name)).find(existsSync) || null;
 }
 export function inventory() {
-  return PROVIDERS.map(p => ({ ...p, executable: resolveExecutable(p.id), status: resolveExecutable(p.id) ? 'installed' : 'missing' }));
+  return PROVIDERS.map(p => ({ ...p, executable: resolveExecutable(p.id), status: resolveExecutable(p.id) ? 'installed' : 'missing', independent: isolationAvailable() && p.id !== 'agy' }));
 }
 export function safeEnvironment() {
   const allowed = ['PATH', 'HOME', 'USER', 'LOGNAME', 'SHELL', 'TMPDIR', 'LANG', 'LC_ALL', 'CODEX_HOME', 'OPENAI_API_KEY', 'ANTHROPIC_API_KEY', 'CLAUDE_CODE_OAUTH_TOKEN'];
   return Object.fromEntries(allowed.filter(k => process.env[k] !== undefined).map(k => [k, process.env[k]]));
 }
 const toml = v => JSON.stringify(v);
-export function buildInvocation(id, { prompt, workspace, mcpFile, mcpServers, nodePath, model, claudeAllowedTools = [] }) {
+export function buildInvocation(id, { prompt, workspace, mcpFile, mcpServers, nodePath, model, claudeAllowedTools = [], timeoutMs = 180000, schemaFile, schema, independent = false }) {
   if (id === 'codex') {
     const args = ['exec', '--json', '--ephemeral', '--ignore-user-config', '--skip-git-repo-check', '--sandbox', 'read-only', '-C', workspace];
     if (model) args.push('--model', model);
+    if (schemaFile) args.push('--output-schema', schemaFile);
     args.push('-c', 'mcp_servers.roundtable.default_tools_approval_mode="approve"');
     for (const [name, cfg] of Object.entries(mcpServers)) {
       const prefix = `mcp_servers.${name}`;
@@ -41,24 +44,35 @@ export function buildInvocation(id, { prompt, workspace, mcpFile, mcpServers, no
     const args = ['--print', '--output-format', 'stream-json', '--verbose', '--no-session-persistence', '--setting-sources', 'project', '--strict-mcp-config', '--mcp-config', mcpFile,
       '--permission-mode', 'dontAsk', '--tools', 'Read,Glob,Grep,WebSearch,WebFetch', '--allowedTools', ['Read','Glob','Grep','WebSearch','WebFetch','mcp__roundtable__*',...claudeAllowedTools].join(',')];
     if (model) args.push('--model', model);
+    if (schema) args.push('--json-schema', JSON.stringify(schema));
+    if (independent) args.push('--restricted', '--disable-slash-commands', '--settings', JSON.stringify({ autoMemoryEnabled: false, disableAllHooks: true }));
     return { command: 'claude', args, stdin: prompt };
   }
   if (id === 'agy') {
-    const args = ['--print', prompt, '--output-format', 'stream-json', '--mode', 'plan', '--sandbox', '--print-timeout', '180s'];
+    const args = ['--print', prompt, '--output-format', 'stream-json', '--mode', 'plan', '--sandbox', '--print-timeout', `${Math.ceil(timeoutMs/1000)}s`];
     if (model) args.push('--model', model);
     return { command: 'agy', args, stdin: '' };
   }
   throw new Error('未知参会者');
 }
 export async function runCli(id, opts) {
+  if (opts.phase) {
+    mkdirSync(opts.artifactDir, { recursive: true, mode: 0o700 });
+    opts = { ...opts, schema: outputSchema(opts.phase), schemaFile: join(opts.artifactDir, 'output-schema.json') };
+    writeFileSync(opts.schemaFile, JSON.stringify(opts.schema));
+  }
   const invocation = buildInvocation(id, opts);
   const executable = resolveExecutable(invocation.command);
   if (!executable) throw new Error(`${invocation.command} 尚未安装或不在 PATH 中。`);
   mkdirSync(opts.artifactDir, { recursive: true, mode: 0o700 });
+  if (opts.independent && id === 'agy') throw new Error('AGY 的独立工具范围尚未验证；目前可在讨论模式参会');
+  const launch = opts.independent ? isolateInvocation(executable, invocation.args, { callDir: opts.artifactDir, protectedRoots: opts.protectedRoots }) : { command: executable, args: invocation.args };
   writeFileSync(join(opts.artifactDir, 'prompt.md'), opts.prompt);
+  writeFileSync(join(opts.artifactDir, 'raw.jsonl'), ''); writeFileSync(join(opts.artifactDir, 'stderr.txt'), '');
   const manifest = { participant: id, executable, modelRequested: opts.model || null,
     promptSha256: createHash('sha256').update(opts.prompt).digest('hex'), skillSha256: opts.skillHash, mcpConfigSha256: opts.mcpHash,
-    mcpNames: id === 'agy' ? [] : Object.keys(opts.mcpServers), startedAt: new Date().toISOString(), cwd: opts.workspace };
+    mcpNames: id === 'agy' ? [] : Object.keys(opts.mcpServers), outputLanguage: opts.outputLanguage || null, inputHash: opts.inputHash || null,
+    isolation: opts.independent ? 'macos-protected-data-tree' : null, startedAt: new Date().toISOString(), cwd: opts.workspace };
   writeFileSync(join(opts.artifactDir, 'manifest.json'), JSON.stringify(manifest, null, 2));
   return new Promise(resolve => {
     let raw = '', stderr = '', lineBuffer = '', timedOut = false, cancelled = false, overflow = false;
@@ -85,7 +99,7 @@ export async function runCli(id, opts) {
     const timer = setTimeout(() => { timedOut = true; terminate(); }, opts.timeoutMs || 180000);
     try {
       // No shell; participant content is passed through stdin (AGY requires argv).
-      proc = spawn(executable, invocation.args, { cwd: opts.workspace, env: { ...safeEnvironment(), ...opts.extraEnv }, detached: process.platform !== 'win32', shell: false, stdio: ['pipe', 'pipe', 'pipe'] });
+      proc = spawn(launch.command, launch.args, { cwd: opts.workspace, env: { ...safeEnvironment(), ...opts.extraEnv }, detached: process.platform !== 'win32', shell: false, stdio: ['pipe', 'pipe', 'pipe'] });
     } catch (e) { finish(null, e); return; }
     proc.stdout.setEncoding('utf8'); proc.stderr.setEncoding('utf8');
     let done = false;
@@ -96,6 +110,7 @@ export async function runCli(id, opts) {
     proc.stdout.on('data', chunk => {
       if (overflow) return;
       raw += chunk.toString();
+      appendFileSync(join(opts.artifactDir, 'raw.jsonl'), chunk);
       if (raw.length > 8 * 1024 * 1024) { overflow = true; terminate(); return; }
       lineBuffer += chunk.toString();
       const lines = lineBuffer.split('\n'); lineBuffer = lines.pop();
@@ -107,7 +122,7 @@ export async function runCli(id, opts) {
         } catch {}
       }
     });
-    proc.stderr.on('data', c => { if (stderr.length < 1024 * 1024) stderr += c.toString(); });
+    proc.stderr.on('data', c => { if (stderr.length < 1024 * 1024) { stderr += c.toString(); appendFileSync(join(opts.artifactDir, 'stderr.txt'), c); } });
     proc.stdin.on('error', () => {});
     opts.signal?.addEventListener('abort', abort, { once: true });
     if (opts.signal?.aborted) abort();

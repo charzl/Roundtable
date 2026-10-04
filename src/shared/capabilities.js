@@ -26,12 +26,18 @@ export class Capabilities {
       note: '配置传入与实际工具调用分别记录。AGY 尚不支持本项目的 MCP 配置适配。' };
   }
   update(config) { validateMcp(config); writeFileSync(join(this.root, 'mcp.json'), JSON.stringify(config, null, 2)); }
-  prepare({ meetingDir, callDir, participant, callId, snapshot }) {
+  prepare({ meetingDir, callDir, participant, callId, snapshot, messages = [], research = [], independent = false }) {
     const token = randomUUID();
-    writeFileSync(join(meetingDir, 'access.json'), JSON.stringify({ token, participant, callId }), { mode: 0o600 });
-    const env = { ELECTRON_RUN_AS_NODE: '1', ROUNDTABLE_MEETING_DIR: meetingDir, ROUNDTABLE_TOKEN: token, ROUNDTABLE_PARTICIPANT: participant, ROUNDTABLE_CALL_ID: callId };
+    const scopeDir = join(callDir, 'scope'); mkdirSync(scopeDir, { recursive: true, mode: 0o700 });
+    writeFileSync(join(scopeDir, 'access.json'), JSON.stringify({ token, participant, callId }), { mode: 0o600 });
+    writeFileSync(join(scopeDir, 'meeting.json'), JSON.stringify({ messages }), { mode: 0o600 });
+    writeFileSync(join(scopeDir, 'research.jsonl'), research.map(e => JSON.stringify(e)+'\n').join(''), { mode: 0o600 });
+    const env = { ELECTRON_RUN_AS_NODE: '1', ROUNDTABLE_MEETING_DIR: scopeDir, ROUNDTABLE_TOKEN: token, ROUNDTABLE_PARTICIPANT: participant, ROUNDTABLE_CALL_ID: callId };
     const servers = { roundtable: { command: this.nodePath, args: [resolve(dirname(fileURLToPath(import.meta.url)), 'mcp-server.js')], env } };
     for (const [name, cfg] of Object.entries(snapshot.config.mcpServers)) {
+      // External shared memory cannot establish independent investigations.
+      // First implementation excludes external MCP during this phase.
+      if (independent) continue;
       const safe = { ...cfg }; delete safe.envRefs;
       if (cfg.envRefs) {
         safe.env = { ...safe.env };
@@ -69,10 +75,10 @@ export class Capabilities {
     const claudeAllowedTools = Object.entries(servers).flatMap(([name, cfg]) => (cfg.allowedTools || []).map(tool => `mcp__${name}__${tool}`));
     const mcpFile = join(callDir, 'mcp.json'); mkdirSync(callDir, { recursive: true, mode: 0o700 });
     writeFileSync(mcpFile, JSON.stringify({ mcpServers: claudeServers }), { mode: 0o600 });
-    return { mcpServers: codexServers, mcpFile, nodePath: this.nodePath, skillHash: snapshot.skillHash, mcpHash: snapshot.mcpHash, extraEnv, claudeAllowedTools };
+    return { mcpServers: codexServers, mcpFile, scopeDir, nodePath: this.nodePath, skillHash: snapshot.skillHash, mcpHash: snapshot.mcpHash, extraEnv, claudeAllowedTools };
   }
   revoke(meetingDir, callDir) {
-    writeFileSync(join(meetingDir, 'access.json'), '{}');
+    writeFileSync(join(callDir, 'scope', 'access.json'), '{}');
     // Keep provider logs and manifest, but never retain secret-bearing runtime config.
     writeFileSync(join(callDir, 'mcp.json'), JSON.stringify({ redacted: true }));
   }

@@ -10,3 +10,5 @@ output/
 !.env.example
 .build/
 DerivedData/
+
+electron-profile/

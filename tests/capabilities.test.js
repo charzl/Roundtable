@@ -7,3 +7,6 @@ test('shared config adapts to both providers without placing env credentials in 
 test('unknown fields, reserved names and blanket tool wildcards are rejected',()=>{
  assert.throws(()=>validateMcp({mcpServers:{roundtable:{command:'x'}}}));assert.throws(()=>validateMcp({mcpServers:{a:{command:'x',allowedTools:['*']}}}));assert.throws(()=>validateMcp({mcpServers:{a:{command:'x',unrecognized:true}}}));
 });
+test('parallel projection tokens stay independent and revoking one does not revoke its peer',t=>{
+ const root=mkdtempSync(join(tmpdir(),'roundtable-token-test-'));t.after(()=>rmSync(root,{recursive:true,force:true}));const caps=new Capabilities(join(root,'shared')),meetingDir=join(root,'meeting');mkdirSync(meetingDir);const first=caps.prepare({meetingDir,callDir:join(meetingDir,'first'),participant:'codex',callId:'first',snapshot:caps.info(),messages:[{id:'M-001'}],independent:true});const second=caps.prepare({meetingDir,callDir:join(meetingDir,'second'),participant:'claude',callId:'second',snapshot:caps.info(),messages:[{id:'M-001'}],independent:true});assert.notEqual(first.extraEnv.ROUNDTABLE_TOKEN,second.extraEnv.ROUNDTABLE_TOKEN);caps.revoke(meetingDir,join(meetingDir,'second'));assert.equal(JSON.parse(readFileSync(join(first.scopeDir,'access.json'))).callId,'first');assert.deepEqual(JSON.parse(readFileSync(join(second.scopeDir,'access.json'))),{});
+});
