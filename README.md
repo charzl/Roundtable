@@ -2,15 +2,33 @@
 
 让人和多个真实 AI agent 在同一场会议里提问、回应、核查和反驳，形成有依据、保留异议的决策稿。
 
-当前 0.2.2 版是运行在 Mac mini 上的 macOS 桌面应用：Electron 界面 + 独立本地会议服务 + Codex / Claude / AGY / Cursor CLI 适配器。后续手机 App 可接入会议服务；本版尚无手机 App 或远程接入。  
-Version 0.2.2 is a macOS desktop app running on Mac mini: Electron interface + standalone local meeting daemon + Codex / Claude / AGY / Cursor CLI adapters. Mobile apps will connect to the meeting daemon in future releases; no mobile app or remote connection is included in this release.
+当前项目采用多技术栈并行架构（Multi-Stack Architecture）：
+- 🐍 **`python/`**：**Python + PySide6 客户端**（聚焦开发：跨端灵活、包体仅 78MB、内存仅 140MB，详见 [python/README.md](python/README.md)）
+- 🍎 **`swift/`**：**Swift 6.4 原生客户端**（聚焦开发：macOS 原生极致体验、包体不足 1MB、内存仅 100MB、未来直通 iOS，详见 [swift/README.md](swift/README.md)）
+- ⚡ **`javascript/`**：**JavaScript / Electron 客户端**（原有基线版本：Node.js 22 本地服务守护进程与 Electron 界面，详见 [javascript/README.md](javascript/README.md)）
+- 📊 **`benchmark.py`**：全架构实测数据与能效分析工具（详见 [跨架构实测报告](docs/benchmark-comparison.md)）
 
-## 本地使用
+---
 
-本机需安装 Node.js，以及至少两种可用的参会 CLI，并完成各自登录。本项目不会复制账号凭据或修改全局 MCP 配置。
+## 快速导航与本地使用 / Getting Started
 
+### 1. 运行 Python 客户端 (推荐)
 ```sh
-npm ci
+cd python
+python3 -m venv .venv && source .venv/bin/activate
+pip install -r requirements.txt
+python main.py
+```
+
+### 2. 运行 Swift 原生客户端 (macOS 极致体验)
+```sh
+cd swift
+swift run
+```
+
+### 3. 运行 JavaScript / Electron 客户端 (基线版本)
+```sh
+npm ci --prefix javascript
 npm start
 ```
 

@@ -35,7 +35,8 @@ export function buildMacApp(rootDir = resolve('.')) {
   mkdirSync(appDir, { recursive: true });
 
   for (const file of ['src', 'ui', 'shared', 'LICENSE', 'NOTICE', 'third_party']) {
-    cpSync(join(rootDir, file), join(appDir, file), { recursive: true });
+    const srcPath = existsSync(join(rootDir, file)) ? join(rootDir, file) : join(rootDir, '..', file);
+    if (existsSync(srcPath)) cpSync(srcPath, join(appDir, file), { recursive: true });
   }
 
   const pkg = JSON.parse(readFileSync(join(rootDir, 'package.json'), 'utf8'));

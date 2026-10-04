@@ -76,36 +76,44 @@ def measure_runtime(binary_path: str, name: str, wait_seconds: float = 3.0):
     }
 
 def main():
-    root = Path(__file__).resolve().parent.parent
+    root = Path(__file__).resolve().parent
     dist_electron = root / "dist" / "Roundtable.app"
+    if not dist_electron.exists():
+        dist_electron = root / "javascript" / "dist" / "Roundtable.app"
     bin_electron = dist_electron / "Contents" / "MacOS" / "Roundtable"
     
-    dist_pyside = root / "alternatives" / "pyside6" / "dist" / "Roundtable-PySide6.app"
+    dist_pyside = root / "python" / "dist" / "Roundtable-PySide6.app"
     bin_pyside = dist_pyside / "Contents" / "MacOS" / "Roundtable-PySide6"
     
-    dist_swift = root / "alternatives" / "swift" / "dist" / "Roundtable-Swift.app"
+    dist_swift = root / "swift" / "dist" / "Roundtable-Swift.app"
     bin_swift = dist_swift / "Contents" / "MacOS" / "RoundtableSwift"
 
     # Package sizes
     def get_bundle_size_mb(path: Path) -> float:
+        if not path.exists():
+            return 0.0
         res = subprocess.run(["du", "-sk", str(path)], capture_output=True, text=True)
         return int(res.stdout.split()[0]) / 1024.0
 
     def get_file_size_mb(path: Path) -> float:
+        if not path.exists():
+            return 0.0
         return path.stat().st_size / (1024.0 * 1024.0)
 
     # 1. Electron
     zip_electron = root / "dist" / "Roundtable-0.2.2-mac-arm64.zip"
+    if not zip_electron.exists():
+        zip_electron = root / "javascript" / "dist" / "Roundtable-0.2.2-mac-arm64.zip"
     size_electron_app = get_bundle_size_mb(dist_electron)
     size_electron_zip = get_file_size_mb(zip_electron)
 
     # 2. PySide6
-    zip_pyside = root / "alternatives" / "pyside6" / "dist" / "Roundtable-PySide6-mac-arm64.zip"
+    zip_pyside = root / "python" / "dist" / "Roundtable-PySide6-mac-arm64.zip"
     size_pyside_app = get_bundle_size_mb(dist_pyside)
     size_pyside_zip = get_file_size_mb(zip_pyside)
 
     # 3. Swift
-    zip_swift = root / "alternatives" / "swift" / "dist" / "Roundtable-Swift-mac-arm64.zip"
+    zip_swift = root / "swift" / "dist" / "Roundtable-Swift-mac-arm64.zip"
     size_swift_app = get_bundle_size_mb(dist_swift)
     size_swift_zip = get_file_size_mb(zip_swift)
 
