@@ -1,4 +1,7 @@
 import test from 'node:test';import assert from 'node:assert/strict';
+import { mkdtempSync, mkdirSync, writeFileSync, existsSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import {parseEvents,parseAnswer} from '../src/providers/events.js';import {buildInvocation} from '../src/providers/cli.js';
 test('startup and partial stdout are never accepted as a completed answer',()=>{
  assert.equal(parseEvents('{"type":"thread.started","thread_id":"fixture"}\n').completed,false);
@@ -22,3 +25,38 @@ test('AGY commentary is preserved in raw events but only final response becomes 
  const events=[{event:'step_update',step_update:{step_index:1,step_type:'agent_response',text_delta:'commentary'}},{event:'step_update',step_update:{step_index:4,step_type:'agent_response',text_delta:'{"statement":'}},{event:'step_update',step_update:{step_index:4,step_type:'agent_response',text_delta:'"fixture"}'}},{event:'result',result:{status:'SUCCESS',response:'commentary\\n{"statement":"fixture"}'}}];
  assert.equal(parseAnswer(parseEvents(events.map(e=>JSON.stringify(e)).join('\n')).text).statement,'fixture');
 });
+
+test('Cursor invocation sets plan mode, output format stream-json and trust flag', () => {
+ const dir = mkdtempSync(join(tmpdir(), 'cursor-test-'));
+ const mcpFile = join(dir, 'mcp.json');
+ writeFileSync(mcpFile, JSON.stringify({ mcpServers: { test: { command: 'echo' } } }));
+ const ws = join(dir, 'ws');
+ mkdirSync(ws);
+ const call = buildInvocation('cursor', { prompt: 'fixture-prompt', workspace: ws, model: 'claude-3-5-sonnet', mcpFile });
+ assert.ok(call.args.includes('--print'));
+ assert.ok(call.args.includes('fixture-prompt'));
+ assert.ok(call.args.includes('stream-json'));
+ assert.ok(call.args.includes('--mode'));
+ assert.ok(call.args.includes('plan'));
+ assert.ok(call.args.includes('--trust'));
+ assert.ok(call.args.includes('--model'));
+ assert.ok(call.args.includes('claude-3-5-sonnet'));
+ assert.ok(call.args.includes('--workspace'));
+ assert.ok(call.args.includes(ws));
+ assert.ok(call.args.includes('--approve-mcps'));
+ assert.equal(existsSync(join(ws, '.cursor', 'mcp.json')), true);
+});
+
+test('Cursor stream-json events protocol is accepted and text is extracted', () => {
+ const events = [
+   { type: 'system', subtype: 'init', model: 'claude-3-5-sonnet', session_id: 'cursor-sess-1' },
+   { type: 'assistant', message: { role: 'assistant', content: [{ type: 'text', text: '{"statement":"cursor analysis"}' }] }, session_id: 'cursor-sess-1' },
+   { type: 'result', subtype: 'success', is_error: false, result: '{"statement":"cursor analysis"}', session_id: 'cursor-sess-1' }
+ ];
+ const parsed = parseEvents(events.map(e => JSON.stringify(e)).join('\n'));
+ assert.equal(parsed.completed, true);
+ assert.equal(parsed.model, 'claude-3-5-sonnet');
+ assert.equal(parsed.sessionId, 'cursor-sess-1');
+ assert.equal(parseAnswer(parsed.text).statement, 'cursor analysis');
+});
+

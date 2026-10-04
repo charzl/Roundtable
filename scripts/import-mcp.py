@@ -1,7 +1,16 @@
 # Reads only MCP sections; outputs to the parent process, never to a checked-in file.
 import json, os, pathlib, tomllib
 home = pathlib.Path.home()
-paths = [('codex', pathlib.Path(os.environ.get('CODEX_HOME', str(home/'.codex')))/'config.toml'), ('claude', home/'.claude.json'), ('claude', home/'.claude/settings.json'), ('claude', home/'.claude/settings.local.json'), ('agy', home/'.gemini/config/mcp_config.json')]
+paths = [
+    ('codex', pathlib.Path(os.environ.get('CODEX_HOME', str(home/'.codex')))/'config.toml'),
+    ('claude', home/'.claude.json'),
+    ('claude', home/'.claude/settings.json'),
+    ('claude', home/'.claude/settings.local.json'),
+    ('agy', home/'.gemini/config/mcp_config.json'),
+    ('cursor', home/'.cursor/mcp.json'),
+    ('cursor', home/'Library/Application Support/Cursor/User/globalStorage/cursor.mcp/mcp.json'),
+    ('cursor', pathlib.Path('.cursor/mcp.json')),
+]
 sources = []
 for runtime, path in paths:
     if not path.exists(): continue
