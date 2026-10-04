@@ -56,6 +56,9 @@ EOF
 
 echo "APPL????" > "$APP_DIR/Contents/PkgInfo"
 
+# Ad-hoc codesign the bundle
+codesign --force --deep -s - "$APP_DIR"
+
 # 3. Measure sizes
 APP_SIZE_KB=$(du -sk "$APP_DIR" | awk '{print $1}')
 APP_SIZE_MB=$(echo "scale=2; $APP_SIZE_KB / 1024" | bc)
