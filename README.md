@@ -2,8 +2,9 @@
 
 让人和多个真实 AI agent 在同一场会议里提问、回应、核查和反驳，形成有依据、保留异议的决策稿。
 
-当前 0.2.2 版是运行在 Mac mini 上的 macOS 桌面应用：Electron 界面 + 独立本地会议服务 + Codex / Claude / AGY / Cursor CLI 适配器。后续手机 App 可接入会议服务；本版尚无手机 App 或远程接入。  
-Version 0.2.2 is a macOS desktop app running on Mac mini: Electron interface + standalone local meeting daemon + Codex / Claude / AGY / Cursor CLI adapters. Mobile apps will connect to the meeting daemon in future releases; no mobile app or remote connection is included in this release.
+当前源码开发版 0.3.1 是运行在 Mac mini 上的 macOS 桌面应用：Electron 界面 + 独立本地会议服务 + Codex / Claude / AGY CLI 适配器。目前只专注 Mac；手机 App、云端和远程接入暂缓。
+
+Version 0.3.1 is a macOS desktop app with Codex / Claude / AGY participants and a separately selectable Organizer (Cursor by default). Mobile apps, cloud services and remote access are deferred.
 
 ## 本地使用
 
@@ -16,7 +17,11 @@ npm start
 
 创建会议时可选择「共同讨论」或「独立调查」，选择 Leader（负责最终总结）和会议输出语言，再选择参会者与轮数。共同讨论依次发言；独立调查让 Codex、Claude 同时分析同一题目，报告齐备后统一公开，再依次对比、核查与讨论。调查算第 1 轮。默认最多 10 轮；一轮内所有参会者各公开发言一次。只有全员在同一轮建议总结，才自动提前结束；仍可保留交给用户判断的异议和问题。人类在 agent 发言期间提交的内容会排队，于回合边界公开。共同讨论的暂停在当前回合结束后生效；独立调查暂停会取消在途调用，保留已封存报告。结束会取消在途调用并整理已有材料。独立调查失败可单独重试、明确跳过，或暂停后按新题目重做；缺席不计为同意。
 
-应用右上角可选择「中文」「English」「随系统」，默认随系统。会议输出语言单独选择，开始时固定；切换界面语言保留原文、证据及未保存的决定草稿。Leader 在会议结束时汇总全部参会者意见，生成具名总结和决策稿，用户自己的决定单独保存；可更换 Leader重试，并保留旧稿。
+应用右上角可选择「中文」「English」「随系统」，默认随系统。回答语言默认「用提问者的语言回答」，独立于界面和系统语言；也可明确指定中文或 English。中文提问要求中文回应，英文提问要求英文回应；会后追问跟随当前问题，问题里明确要求另一种语言时优先遵守。共同调查的同批语言要求固定，后续公开问题在回合边界影响新调用。旧版「随系统」会议的后续调用也跟随提问，旧原文和调用记录保留。切换界面语言保留原文、证据及未保存的决定草稿。Leader 在会议结束时汇总全部参会者意见，生成具名总结和决策稿，用户自己的决定单独保存；可更换 Leader重试，并保留旧稿。
+
+Organizer 与 Leader 独立选择。新会议默认 Cursor 做 Organizer，也可选择 Codex、Claude、AGY 或不用 Organizer。Organizer 只观察、安排轮次内发言顺序、指出待核查问题和分配会后追问，不提交研究报告、不参加讨论、不负责最终总结。被选为 Organizer 的运行时不能同时勾选为参会者或 Leader；Leader 从参会者中选择。旧会议保留原角色，不自动加入 Cursor。Organizer 建议不能越过轮数上限或冒充共识。
+
+讨论和总结后都在 Discussion（公开讨论）的同一个输入框持续提问，由 Organizer 根据实际公开发言选择一位原参会者，或直接点名、追问某条发言。指代不清时等待用户选择；失败可重试或换人。追问过程中不自动更新总结；问完后点击 Summary（总结与决定）里的「重新生成总结（Regenerate summary）」，由 Leader 汇总原讨论及后续问答、修正和依据，保存新版本并保留旧稿，不增加原会议轮数。Cursor 接入代码已加入，但此前核查 CLI 显示未登录，尚无本次开发验证的真实主持／分配成功证据。请运行 `cursor-agent login`，完成后回到窗口刷新状态；登录成功也不等于模型调用已验证。其他运行时的新 Organizer 角色同样仅经过测试适配器验证。详见 [Organizer 与追问验收](docs/organizer-verification.md)。
 
 点击「导出」保存公开记录、观点、研究和核查记录，以及调用的提示词、原始输出与清单。来源链接存在不代表观点已被验证。
 
@@ -66,6 +71,7 @@ npm run check
 npm test
 npm run smoke:desktop
 npm run smoke:packaged
+npm run smoke:organizer
 ```
 
 以下命令会调用真实模型，消耗对应账号额度：
@@ -78,6 +84,8 @@ npm run smoke:three-independent
 ```
 
 桌面服务只监听本机回环地址，API 使用临时会话授权。单独开发服务可用 `npm run serve`，按终端输出的本地地址进入。
+
+npm 用于安装依赖和运行脚本，不是桌面安装包格式。当前 `.app` 由 `scripts/build-mac.js` 生成；尚未迁移 pnpm、Bun、Electron Forge 或 electron-builder。`smoke:organizer` 使用隔离、明确标注的测试数据，不调用真实模型，也不修改正常桌面会议数据。
 
 ## 许可与来源
 

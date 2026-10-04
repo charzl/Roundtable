@@ -5,6 +5,8 @@ const claim = object({ text: string, kind: { type: 'string', enum: ['fact', 'inf
 const option = { name: string, pros: strings, cons: strings };
 const turn = { statement: string, replyTo: strings, claims: { type: 'array', items: claim }, readyToConclude: { type: 'boolean' }, openQuestions: strings };
 export function outputSchema(phase) {
+  if (phase === 'organize') return object({ order: strings, reason: string, evidenceIds: strings, focus: string, unresolvedQuestions: strings, suggestSummary: { type: 'boolean' } });
+  if (phase === 'route') return object({ target: string, reason: string, evidenceIds: strings, needsClarification: { type: 'boolean' }, clarification: string });
   if (phase === 'decision') return object({ recommendation: string, options: { type: 'array', items: object({ ...option, evidenceIds: strings }) }, disagreements: strings, unknowns: strings });
   if (phase === 'investigation') return object({ ...turn, recommendation: string, options: { type: 'array', items: object(option) }, assumptions: strings, limitations: strings });
   return object(turn);

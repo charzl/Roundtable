@@ -1,6 +1,6 @@
 {
   "name": "roundtable-desktop",
-  "version": "0.2.2",
+  "version": "0.3.1",
   "private": true,
   "description": "圆桌会议：本地人类与真实 agent 会议 / Roundtable: Local human and real agent meetings",
   "license": "Apache-2.0",
@@ -22,7 +22,8 @@
     "preview:independent": "node scripts/preview-independent.js",
     "smoke:upgrade": "node scripts/smoke-upgrade.js",
     "smoke:three-independent": "node scripts/smoke-three-independent.js",
-    "import:mcp": "node scripts/import-mcp.js"
+    "import:mcp": "node scripts/import-mcp.js",
+    "smoke:organizer": "node scripts/smoke-organizer.js"
   },
   "devDependencies": {
     "electron": "44.5.1",

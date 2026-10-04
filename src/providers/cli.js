@@ -1,5 +1,5 @@
-import { spawn } from 'node:child_process';
-import { existsSync, writeFileSync, appendFileSync, mkdirSync, copyFileSync } from 'node:fs';
+import { spawn, spawnSync } from 'node:child_process';
+import { existsSync, writeFileSync, appendFileSync, mkdirSync } from 'node:fs';
 import { delimiter, join, dirname } from 'node:path';
 import { createHash } from 'node:crypto';
 import { parseEvents } from './events.js';
@@ -10,32 +10,46 @@ export const PROVIDERS = [
   { id: 'codex', name: 'Codex', provider: 'OpenAI', sharedMcp: true },
   { id: 'claude', name: 'Claude', provider: 'Anthropic', sharedMcp: true },
   { id: 'agy', name: 'Antigravity', provider: '运行时默认模型（待输出确认）', sharedMcp: false },
-  { id: 'cursor', name: 'Cursor', provider: 'Anysphere', sharedMcp: true },
 ];
+export const DEFAULT_ORGANIZER = 'cursor';
+export const ORGANIZERS = [{ id: 'cursor', name: 'Cursor', provider: 'Cursor CLI', role: 'organizer' }, ...PROVIDERS.map(p => ({ ...p, role: 'organizer' }))];
+export function organizerInventory() {
+  return ORGANIZERS.map(p => {
+    if (p.id !== 'cursor') {
+      const executable = resolveExecutable(p.id);
+      return { ...p, executable, status: executable ? 'installed' : 'missing' };
+    }
+    const executable = resolveExecutable('cursor-agent');
+    if (!executable) return { ...p, executable: null, status: 'missing' };
+    const result = spawnSync(executable, ['status'], { encoding: 'utf8', timeout: 5000, env: safeEnvironment() });
+    const output = (result.stdout || '') + (result.stderr || '');
+    const status = /not logged in|authentication required/i.test(output) ? 'needs_login' : result.status === 0 ? 'authenticated' : 'auth_unknown';
+    return { ...p, executable, status };
+  });
+}
 export function resolveExecutable(name, env = process.env) {
   if (name.includes('/')) return existsSync(name) ? name : null;
-  const candidates = name === 'cursor' ? ['cursor-agent', 'agent', 'cursor'] : [name];
-  const paths = (env.PATH || '').split(delimiter);
-  for (const c of candidates) {
-    const found = paths.map(p => join(p, c)).find(existsSync);
-    if (found) return found;
-  }
-  return null;
+  return (env.PATH || '').split(delimiter).map(p => join(p, name)).find(existsSync) || null;
 }
 export function inventory() {
   return PROVIDERS.map(p => ({ ...p, executable: resolveExecutable(p.id), status: resolveExecutable(p.id) ? 'installed' : 'missing', independent: isolationAvailable(), scopedMcp: p.id !== 'agy' }));
 }
 export function safeEnvironment() {
-  const allowed = ['PATH', 'HOME', 'USER', 'LOGNAME', 'SHELL', 'TMPDIR', 'LANG', 'LC_ALL', 'CODEX_HOME', 'OPENAI_API_KEY', 'ANTHROPIC_API_KEY', 'CLAUDE_CODE_OAUTH_TOKEN', 'CURSOR_API_KEY', 'CURSOR_DATA_DIR'];
+  const allowed = ['PATH', 'HOME', 'USER', 'LOGNAME', 'SHELL', 'TMPDIR', 'LANG', 'LC_ALL', 'CODEX_HOME', 'OPENAI_API_KEY', 'ANTHROPIC_API_KEY', 'CLAUDE_CODE_OAUTH_TOKEN', 'CURSOR_API_KEY', 'CURSOR_AUTH_TOKEN', 'CURSOR_CONFIG_DIR', 'CURSOR_DATA_DIR'];
   return Object.fromEntries(allowed.filter(k => process.env[k] !== undefined).map(k => [k, process.env[k]]));
 }
 const toml = v => JSON.stringify(v);
-export function buildInvocation(id, { prompt, workspace, mcpFile, mcpServers, nodePath, model, claudeAllowedTools = [], timeoutMs = 180000, schemaFile, schema, independent = false }) {
+export function buildInvocation(id, { prompt, workspace, mcpFile, mcpServers, nodePath, model, claudeAllowedTools = [], timeoutMs = 180000, schemaFile, schema, independent = false, role = 'participant' }) {
+  if (id === 'cursor') {
+    const args = ['--print', '--output-format', 'stream-json', '--mode', 'ask', '--sandbox', 'enabled', '--trust', '--workspace', workspace];
+    if (model) args.push('--model', model);
+    return { command: 'cursor-agent', args, stdin: prompt };
+  }
   if (id === 'codex') {
     const args = ['exec', '--json', '--ephemeral', '--ignore-user-config', '--skip-git-repo-check', '--sandbox', 'read-only', '-C', workspace];
     if (model) args.push('--model', model);
     if (schemaFile) args.push('--output-schema', schemaFile);
-    args.push('-c', 'mcp_servers.roundtable.default_tools_approval_mode="approve"');
+    if (mcpServers.roundtable) args.push('-c', 'mcp_servers.roundtable.default_tools_approval_mode="approve"');
     for (const [name, cfg] of Object.entries(mcpServers)) {
       const prefix = `mcp_servers.${name}`;
       for (const [key, value] of Object.entries(cfg)) {
@@ -49,7 +63,7 @@ export function buildInvocation(id, { prompt, workspace, mcpFile, mcpServers, no
   }
   if (id === 'claude') {
     const args = ['--print', '--output-format', 'stream-json', '--verbose', '--no-session-persistence', '--setting-sources', 'project', '--strict-mcp-config', '--mcp-config', mcpFile,
-      '--permission-mode', 'dontAsk', '--tools', 'Read,Glob,Grep,WebSearch,WebFetch', '--allowedTools', ['Read','Glob','Grep','WebSearch','WebFetch','mcp__roundtable__*',...claudeAllowedTools].join(',')];
+      '--permission-mode', 'dontAsk', '--tools', role === 'organizer' ? '' : 'Read,Glob,Grep,WebSearch,WebFetch', '--allowedTools', role === 'organizer' ? '' : ['Read','Glob','Grep','WebSearch','WebFetch','mcp__roundtable__*',...claudeAllowedTools].join(',')];
     if (model) args.push('--model', model);
     if (schema) args.push('--json-schema', JSON.stringify(schema));
     if (independent) args.push('--restricted', '--disable-slash-commands', '--settings', JSON.stringify({ autoMemoryEnabled: false, disableAllHooks: true }));
@@ -60,29 +74,14 @@ export function buildInvocation(id, { prompt, workspace, mcpFile, mcpServers, no
     if (model) args.push('--model', model);
     return { command: 'agy', args, stdin: '' };
   }
-  if (id === 'cursor') {
-    const bin = resolveExecutable('cursor');
-    const isApp = bin && (bin.endsWith('/cursor') || bin.endsWith('/cursor.exe'));
-    const command = bin ? (isApp ? 'cursor' : 'cursor-agent') : 'cursor-agent';
-    const args = isApp ? ['agent'] : [];
-    args.push('--print', prompt, '--output-format', 'stream-json', '--mode', 'plan', '--trust');
-    if (workspace) {
-      args.push('--workspace', workspace);
-      if (mcpFile && existsSync(mcpFile)) {
-        try {
-          const dotCursor = join(workspace, '.cursor');
-          mkdirSync(dotCursor, { recursive: true, mode: 0o700 });
-          copyFileSync(mcpFile, join(dotCursor, 'mcp.json'));
-        } catch {}
-      }
-    }
-    if (model) args.push('--model', model);
-    if (mcpFile) args.push('--approve-mcps');
-    return { command, args, stdin: '' };
-  }
   throw new Error('未知参会者');
 }
 export async function runCli(id, opts) {
+  if (id === 'cursor') {
+    const directory = join(opts.workspace, '.cursor'); mkdirSync(directory, { recursive: true, mode: 0o700 });
+    writeFileSync(join(directory, 'cli.json'), JSON.stringify({ permissions: { allow: [], deny: ['Shell(*)', 'Read(**)', 'Read(/**)', 'Write(**)', 'Write(/**)', 'WebFetch(*)', 'Mcp(*:*)'] } }), { mode: 0o600 });
+    writeFileSync(join(directory, 'mcp.json'), JSON.stringify({ mcpServers: {} }), { mode: 0o600 });
+  }
   if (opts.phase) {
     mkdirSync(opts.artifactDir, { recursive: true, mode: 0o700 });
     opts = { ...opts, schema: outputSchema(opts.phase), schemaFile: join(opts.artifactDir, 'output-schema.json') };
@@ -97,8 +96,9 @@ export async function runCli(id, opts) {
   writeFileSync(join(opts.artifactDir, 'raw.jsonl'), ''); writeFileSync(join(opts.artifactDir, 'stderr.txt'), '');
   const manifest = { participant: id, executable, modelRequested: opts.model || null,
     promptSha256: createHash('sha256').update(opts.prompt).digest('hex'), skillSha256: opts.skillHash, mcpConfigSha256: opts.mcpHash,
-    mcpNames: id === 'agy' ? [] : Object.keys(opts.mcpServers), outputLanguage: opts.outputLanguage || null, inputHash: opts.inputHash || null,
-    isolation: opts.independent ? 'macos-protected-data-tree' : null, scopedMcp: id !== 'agy', externalMcpIsolation: id === 'agy' ? 'unverified-global-config' : opts.independent ? 'external-mcp-omitted' : 'shared-config', startedAt: new Date().toISOString(), cwd: opts.workspace };
+    mcpNames: ['agy', 'cursor'].includes(id) ? [] : Object.keys(opts.mcpServers), outputLanguage: opts.outputLanguage || null, languagePolicy: opts.languagePolicy || null, languageQuestionId: opts.languageQuestionId || null, inputHash: opts.inputHash || null,
+    role: opts.role || 'participant',
+    isolation: opts.independent ? 'macos-protected-data-tree' : null, scopedMcp: !['agy', 'cursor'].includes(id), externalMcpIsolation: id === 'cursor' ? 'not-injected-project-tools-denied' : id === 'agy' ? 'unverified-global-config' : opts.role === 'organizer' ? 'project-mcp-omitted' : opts.independent ? 'external-mcp-omitted' : 'shared-config', startedAt: new Date().toISOString(), cwd: opts.workspace };
   writeFileSync(join(opts.artifactDir, 'manifest.json'), JSON.stringify(manifest, null, 2));
   return new Promise(resolve => {
     let raw = '', stderr = '', lineBuffer = '', timedOut = false, cancelled = false, overflow = false;
@@ -108,9 +108,9 @@ export async function runCli(id, opts) {
       opts.signal?.removeEventListener('abort', abort);
       writeFileSync(join(opts.artifactDir, 'raw.jsonl'), raw);
       writeFileSync(join(opts.artifactDir, 'stderr.txt'), stderr);
-      const parsed = parseEvents(raw);
+      const parsed = parseEvents(raw, { provider: id });
       const result = { ...parsed, exitCode: code, ok: !spawnError && code === 0 && parsed.completed && !!parsed.text && !cancelled && !timedOut && !overflow,
-        error: spawnError?.message || (cancelled ? '调用已取消' : timedOut ? '调用超时，未取得完整结果' : overflow ? '输出超出上限' : parsed.error || (code !== 0 ? `进程退出码 ${code}` : !parsed.completed ? '没有收到 provider 完成事件' : !parsed.text ? '没有有效发言' : null)),
+        error: spawnError?.message || (cancelled ? '调用已取消' : timedOut ? '调用超时，未取得完整结果' : overflow ? '输出超出上限' : parsed.error || (code !== 0 ? `进程退出码 ${code}：${stderr.slice(0, 400)}` : !parsed.completed ? '没有收到 provider 完成事件' : !parsed.text ? '没有有效发言' : null)),
         raw, stderr };
       writeFileSync(join(opts.artifactDir, 'manifest.json'), JSON.stringify({ ...manifest, completedAt: new Date().toISOString(), exitCode: code, ok: result.ok, modelObserved: parsed.model, sessionId: parsed.sessionId, error: result.error }, null, 2));
       resolve(result);

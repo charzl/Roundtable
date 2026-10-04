@@ -1,7 +1,7 @@
 import { I18n } from '/i18n.js';
 const $ = selector => document.querySelector(selector);
 const i18n = new I18n(), t = (key, params) => i18n.t(key, params);
-const state = { token: null, url: location.origin, meetings: [], current: null, config: null, selectedClaim: null, tab: 'discussion', eventAbort: null, connected: false, decisionDrafts: {} };
+const state = { token: null, url: location.origin, meetings: [], current: null, config: null, selectedClaim: null, tab: 'discussion', eventAbort: null, connected: false, decisionDrafts: {}, followupDrafts: {} };
 const label = status => t('status.' + (status === 'completed' ? 'completed' : status || 'created'));
 function element(tag, text, className) { const n = document.createElement(tag); if (text !== undefined) n.textContent = text; if (className) n.className = className; return n; }
 function renderError(root, details) { root.replaceChildren(element('span', t('error.generic'))); if (details) { const d = element('details'); d.append(element('summary', t('error.details')), element('div', details)); root.append(d); } root.hidden = false; }
@@ -11,25 +11,30 @@ async function api(path, options = {}) {
   const data = await response.json(); if (!response.ok) { const e = new Error(t('error.generic')); e.details = data.error; e.code = data.code; throw e; } return data;
 }
 async function action(path, data = {}) { $('#error').hidden = true; document.querySelectorAll('.dialog-error').forEach(e => e.remove()); try { return await api(path, { method: 'POST', body: JSON.stringify(data) }); } catch (e) { messageError(e); throw e; } }
-const providerName = id => id === 'human' ? t('participants.human') : state.config?.providers.find(p => p.id === id)?.name || id;
+const providerName = id => id === 'human' ? t('participants.human') : [...(state.config?.providers || []), ...(state.config?.organizers || [])].find(p => p.id === id)?.name || id;
+const followupBusy = m => m.followups?.some(f => ['routing', 'answering'].includes(f.status));
+const meetingBusy = m => !!m.activeParticipant || !!m.activeParticipants?.length || followupBusy(m);
+const publicMessages = m => [...m.messages, ...(m.followups || []).flatMap(f => [f.questionMessage, f.answerMessage].filter(Boolean))];
+const summaryOutdated = m => !!m.followups?.length && publicMessages(m).some(message => !m.decision?.includedMessageIds?.includes(message.id));
+function saveFollowupDraft() { if (state.current) state.followupDrafts[state.current.id] = { text: $('#message-input').value, target: $('#followup-target').value, replyTo: $('#composer').dataset.replyTo || '' }; }
 const activeReport = (m, p) => m.reports?.find(r => r.participant === p && r.inputVersion === m.inputVersion && ['sealed', 'published'].includes(r.status));
 const investigating = m => m?.mode === 'independent' && ['investigation', 'awaiting_reports'].includes(m.phase);
-function languageOptions(select, value) { select.replaceChildren(); const system = element('option', t('language.system')); system.value = 'system'; select.append(system); for (const p of i18n.manifest.languages) { const o = element('option', p.name); o.value = p.id; select.append(o); } select.value = value || 'system'; }
-function openNew() { languageOptions($('#meeting-language'), i18n.choice); updateMode(); $('#new-dialog').showModal(); $('#topic-input').focus(); }
-function setCurrent(meeting) { state.current = meeting; state.selectedClaim = null; state.tab = 'discussion'; render(); }
+function languageOptions(select, value, meeting = false) { select.replaceChildren(); const automatic = element('option', t(meeting ? 'language.questioner' : 'language.system')); automatic.value = meeting ? 'auto' : 'system'; select.append(automatic); for (const p of i18n.manifest.languages) { const o = element('option', p.name); o.value = p.id; select.append(o); } select.value = meeting && (!value || value === 'system') ? 'auto' : value || 'system'; }
+function openNew() { languageOptions($('#meeting-language'), 'auto', true); updateMode(); $('#new-dialog').showModal(); $('#topic-input').focus(); }
+function setCurrent(meeting) { saveFollowupDraft(); state.current = meeting; state.selectedClaim = null; state.tab = 'discussion'; render(); }
 function renderList() {
   const list = $('#meeting-list'); list.replaceChildren(); if (!state.meetings.length) list.append(element('p', t('meetings.none'), 'muted'));
   for (const m of state.meetings) { const b = element('button', undefined, 'meeting-link' + (state.current?.id === m.id ? ' selected' : '')); b.append(element('strong', m.topic), element('small', `${label(m.status)} · ${new Date(m.createdAt).toLocaleDateString(i18n.language)}`)); b.onclick = () => setCurrent(m); list.append(b); }
 }
 function renderParticipants() {
   const root = $('#participants'); root.replaceChildren(); const m = state.current; if (!m) return; root.append(element('h2', t('participants.title')));
-  for (const id of ['human', ...m.participants]) {
+  for (const id of ['human', ...(m.organizer ? [m.organizer] : []), ...m.participants]) {
     const row = element('div', undefined, 'participant' + (m.activeParticipants?.includes(id) || m.activeParticipant === id ? ' active' : ''));
     row.append(element('span', id === 'human' ? t('participants.human') : providerName(id).slice(0, 2), 'avatar'));
     const content = element('div'), status = m.participantStates[id], latest = m.calls.findLast(c => c.participant === id);
-    content.append(element('strong', providerName(id))); if (id === m.leader) content.append(element('span', t('participants.leader'), 'badge')); content.append(element('small', id === 'human' ? t('participants.host') : status === 'completed' ? t('status.completedCall') : status ? label(status) : t('participants.wait')));
+    content.append(element('strong', providerName(id))); if (id === m.organizer) content.append(element('span', t('organizer.label'), 'badge')); if (id === m.leader) content.append(element('span', t('participants.leader'), 'badge')); content.append(element('small', id === 'human' ? t('participants.host') : status === 'completed' ? t('status.completedCall') : status ? label(status) : t(id === m.organizer ? 'organizer.wait' : 'participants.wait')));
     if (latest?.model) content.append(element('small', latest.model));
-    if (id !== 'human' && investigating(m) && m.status === 'paused' && !activeReport(m, id) && !m.skipped.includes(id)) {
+    if (m.participants.includes(id) && investigating(m) && m.status === 'paused' && !activeReport(m, id) && !m.skipped.includes(id)) {
       const controls = element('div', undefined, 'small-actions');
       for (const verb of ['retry', 'skip']) { const b = element('button', t('action.' + verb)); b.onclick = async () => { try { state.current = await action(`/api/meetings/${m.id}/${verb}`, { participant: id }); render(); } catch {} }; controls.append(b); } content.append(controls);
     }
@@ -38,18 +43,23 @@ function renderParticipants() {
 }
 function selectClaim(id) { state.selectedClaim = id; renderEvidence(); document.querySelectorAll('[data-claim]').forEach(b => b.classList.toggle('selected', b.dataset.claim === id)); }
 function claimButton(c, text) { const b = element('button', text || `${c.id} · ${t('claim.' + c.kind)} · ${t(c.status === 'missing-source' ? 'claim.missing' : 'claim.pending')}`); b.dataset.claim = c.id; b.onclick = () => selectClaim(c.id); return b; }
+function followupButton(message) {
+  const b = element('button', t('followup.quote')); b.disabled = meetingBusy(state.current);
+  b.onclick = () => { saveFollowupDraft(); const draft = state.followupDrafts[state.current.id]; draft.target = message.author; draft.replyTo = message.id; state.tab = 'discussion'; render(); $('#message-input').focus(); }; return b;
+}
 function renderMessages() {
   const root = $('#messages'); root.replaceChildren();
   for (const m of state.current.messages) {
     const article = element('article', undefined, 'message'); article.id = m.id; const head = element('div', undefined, 'message-head');
     head.append(element('span', m.author === 'human' ? t('participants.human') : providerName(m.author).slice(0, 2), 'avatar'), element('strong', providerName(m.author)), element('small', t('message.meta', { id: m.id, round: m.round, origin: t(m.origin === 'provider' ? 'message.provider' : 'message.human') })));
     article.append(head); if (m.replyTo?.length) article.append(element('div', t('message.reply', { ids: m.replyTo.join(', ') }), 'reply')); article.append(element('div', m.text, 'message-text'));
-    if (m.claims.length) { const refs = element('div', undefined, 'claim-list'); for (const c of m.claims) refs.append(claimButton(c)); article.append(refs); } root.append(article);
+    if (m.claims.length) { const refs = element('div', undefined, 'claim-list'); for (const c of m.claims) refs.append(claimButton(c)); article.append(refs); }
+    if (m.origin === 'provider' && state.current.status === 'completed') article.append(followupButton(m)); root.append(article);
   }
   $('#pending').replaceChildren(); for (const pending of state.current.pending) $('#pending').append(element('div', t('message.queued', { text: pending.text }), 'pending'));
 }
 function renderEvidence() {
-  const root = $('#evidence-content'); root.replaceChildren(); const m = state.current, c = m?.messages.flatMap(x => x.claims).find(x => x.id === state.selectedClaim);
+  const root = $('#evidence-content'); root.replaceChildren(); const m = state.current, c = m && publicMessages(m).flatMap(x => x.claims).find(x => x.id === state.selectedClaim);
   if (!c) { root.append(element('div', t('evidence.select'), 'empty')); return; }
   root.append(element('h3', `${c.id} · ${providerName(c.author)}`), element('span', t(c.status === 'missing-source' ? 'claim.missing' : 'claim.unverified'), 'badge'), element('p', c.text), element('h3', t('evidence.sources')));
   if (!c.sources.length) root.append(element('p', t('evidence.noSources'), 'muted'));
@@ -73,13 +83,53 @@ function renderDecision() {
   root.replaceChildren(); const m = state.current, d = m.decision;
   if (!d) { root.append(element('div', t(m.status === 'finalizing' ? 'decision.working' : 'decision.pending'), 'empty')); return; }
   root.append(element('p', d.status === 'provider-draft' ? t('decision.author', { author: providerName(d.author) }) : t('decision.failed'), 'muted'), element('h3', t('decision.recommendation')), element('div', d.recommendation, 'decision-text'));
-  for (const option of d.options) { const box = optionBox(option), refs = element('div', undefined, 'claim-list'); option.evidenceIds.forEach(id => { const c = m.messages.flatMap(x => x.claims).find(c => c.id === id); if (c) refs.append(claimButton(c, id)); }); box.append(refs); root.append(box); }
+  if (summaryOutdated(m)) root.append(element('p', t('summary.outdated'), 'muted'));
+  for (const option of d.options) { const box = optionBox(option), refs = element('div', undefined, 'claim-list'); option.evidenceIds.forEach(id => { const c = publicMessages(m).flatMap(x => x.claims).find(c => c.id === id); if (c) refs.append(claimButton(c, id)); }); box.append(refs); root.append(box); }
   for (const [key, values] of [['decision.dissent', d.disagreements], ['decision.unknowns', d.unknowns]]) appendList(root, key, values.length ? values : [t('decision.empty')]);
-  if (m.status === 'completed' && m.messages.some(x => x.origin === 'provider')) { const b = element('button', t('action.retrySummary')); b.id = 'retry-summary'; b.onclick = async () => { try { state.current = await action(`/api/meetings/${m.id}/summary`); render(); } catch {} }; root.append(b); }
+  if (m.status === 'completed' && m.messages.some(x => x.origin === 'provider')) { const b = element('button', t('action.retrySummary')); b.id = 'retry-summary'; b.disabled = meetingBusy(m); b.onclick = async () => { try { state.current = await action(`/api/meetings/${m.id}/summary`); render(); } catch {} }; root.append(b); }
   if (m.decisionVersions?.length) { const history = element('details'); history.append(element('summary', t('decision.history'))); for (const version of m.decisionVersions) history.append(element('pre', JSON.stringify(version, null, 2))); root.append(history); }
   if (m.status === 'completed') { const form = element('form'); form.id = 'user-decision-form'; const l = element('label', t('decision.yours')); l.htmlFor = 'user-decision-input'; const input = element('textarea'); input.id = 'user-decision-input'; input.dataset.meetingId = m.id; input.rows = 3; input.maxLength = 12000; input.required = true; input.placeholder = t('decision.userPlaceholder'); input.value = state.decisionDrafts[m.id] ?? m.userDecision?.text ?? ''; const b = element('button', t('action.saveDecision'), 'primary'); b.type = 'submit'; form.append(l, input, b); form.onsubmit = async e => { e.preventDefault(); try { state.current = await action(`/api/meetings/${m.id}/decision`, { text: input.value }); render(); } catch {} }; root.append(form); }
 }
 function summaryOptions(select, participants, selected) { select.replaceChildren(); for (const id of participants) { const o = element('option', providerName(id)); o.value = id; select.append(o); } select.value = participants.includes(selected) ? selected : participants[0] || ''; }
+function organizerOptions(select, selected, excluded = []) {
+  select.replaceChildren(); const none = element('option', t('organizer.none')); none.value = ''; select.append(none);
+  for (const p of state.config.organizers || []) { const o = element('option', `${p.name} · ${label(p.status)}`); o.value = p.id; o.disabled = excluded.includes(p.id) || (!p.executable && p.id !== selected); select.append(o); }
+  select.value = selected || '';
+}
+function renderReferences(root, ids) {
+  for (const id of ids || []) {
+    const messages = publicMessages(state.current), c = messages.flatMap(m => m.claims).find(c => c.id === id);
+    if (c) root.append(claimButton(c, id));
+    else { const message = messages.find(m => m.id === id); if (!message) continue; const b = element('button', `${id} · ${providerName(message.author)}`); b.onclick = () => { state.tab = 'discussion'; render(); document.getElementById(id)?.scrollIntoView(); }; root.append(b); }
+  }
+}
+function renderOrganizer() {
+  const m = state.current; organizerOptions($('#meeting-organizer'), m.organizer, m.participants); $('#meeting-organizer').disabled = meetingBusy(m) || ['running', 'finalizing'].includes(m.status);
+  const root = $('#organizer-notes'); root.replaceChildren();
+  for (const plan of m.roundPlans || []) { const d = element('details'); d.append(element('summary', t('organizer.plan', { round: plan.round, author: providerName(plan.author) })), element('p', plan.order.map(providerName).join(' → ')), element('p', plan.reason), element('p', plan.focus)); if (plan.model) d.append(element('small', plan.model, 'muted')); renderReferences(d, plan.evidenceIds); appendList(d, 'organizer.unresolved', plan.unresolvedQuestions); if (plan.suggestSummary) d.append(element('p', t('organizer.suggestSummary'), 'muted')); root.append(d); }
+}
+function renderFollowups() {
+  const m = state.current, root = $('#followup-messages'); root.replaceChildren();
+  for (const f of m.followups || []) {
+    const card = element('article', undefined, 'message'); card.dataset.followupId = f.id;
+    const question = element('div'); question.id = f.questionMessage.id; question.append(element('strong', `${t('participants.human')} · ${f.questionMessage.id}`), element('div', f.questionMessage.text, 'message-text')); card.append(question);
+    card.append(element('p', t('followup.state', { author: f.target ? providerName(f.target) : providerName(m.organizer), status: t('followup.status.' + f.status) }), 'muted'));
+    if (f.route) { const d = element('details'); d.append(element('summary', t('followup.routing', { author: providerName(f.route.author) })), element('p', f.route.reason)); renderReferences(d, f.route.evidenceIds); if (f.route.clarification) d.append(element('p', f.route.clarification)); card.append(d); }
+    else if (f.requestedTarget) card.append(element('p', t('followup.manual'), 'muted'));
+    if (f.answerMessage) { const a = f.answerMessage, box = element('div'); box.id = a.id; box.append(element('strong', `${providerName(a.author)} · ${a.id}`), element('div', a.text, 'message-text')); if (a.model) box.append(element('small', a.model, 'muted')); const refs = element('div', undefined, 'claim-list'); for (const c of a.claims) refs.append(claimButton(c)); box.append(refs, followupButton(a)); card.append(box); }
+    if (f.error) { const error = element('div', undefined, 'error'); renderError(error, f.error); card.append(error); }
+    if (['failed', 'interrupted', 'awaiting_selection'].includes(f.status)) {
+      const select = element('select'); select.setAttribute('aria-label', t('followup.target')); const previous = element('option', t('followup.retryOriginal')); previous.value = ''; previous.disabled = f.status === 'awaiting_selection' || (!f.target && !m.organizer); select.append(previous); for (const id of m.participants) { const o = element('option', providerName(id)); o.value = id; select.append(o); } select.value = previous.disabled ? m.participants[0] : '';
+      const b = element('button', t('action.retry')); b.disabled = meetingBusy(m); b.onclick = async () => { try { state.current = await action(`/api/meetings/${m.id}/followup-retry`, { followupId: f.id, target: select.value }); render(); } catch {} }; card.append(select, b);
+    }
+    root.append(card);
+  }
+  const draft = state.followupDrafts[m.id] || { text: '', target: '', replyTo: '' }, target = $('#followup-target'); target.replaceChildren(); const automatic = element('option', t('followup.auto')); automatic.value = ''; automatic.disabled = !m.organizer; target.append(automatic);
+  for (const id of m.participants) { const o = element('option', providerName(id)); o.value = id; target.append(o); } target.value = draft.target || (m.organizer ? '' : m.leader);
+  $('#message-input').value = draft.text; $('#composer').dataset.replyTo = draft.replyTo;
+  const reference = $('#followup-reference'); reference.replaceChildren(); reference.hidden = !draft.replyTo || m.status !== 'completed'; if (draft.replyTo) { reference.append(element('span', t('message.reply', { ids: draft.replyTo }))); const b = element('button', t('followup.clearReference')); b.type = 'button'; b.onclick = () => { $('#composer').dataset.replyTo = ''; saveFollowupDraft(); renderFollowups(); }; reference.append(b); }
+  const busy = m.status === 'finalizing' || (m.status === 'completed' && meetingBusy(m)); $('#message-input').disabled = busy; target.disabled = busy; $('#composer button[type=submit]').disabled = busy; $('#cancel-followup').hidden = !followupBusy(m); $('#answer-routing').hidden = m.status !== 'completed';
+}
 function render() {
   renderList(); renderParticipants(); const m = state.current; $('#welcome').hidden = !!m; $('#meeting').hidden = !m; if (!m) { $('#research').replaceChildren(); renderEvidence(); return; }
   const heading = m.topic.split('\n')[0]; $('#topic').textContent = heading.length > 60 ? heading.slice(0, 60) + '…' : heading; $('#topic').title = m.topic;
@@ -90,20 +140,23 @@ function render() {
   $('#start-button').hidden = !['created', 'paused'].includes(m.status); $('#start-button').textContent = t(m.status === 'paused' ? 'action.resume' : investigating(m) ? 'action.investigate' : 'action.start');
   $('#pause-button').hidden = m.status !== 'running'; $('#pause-button').disabled = m.pauseRequested; $('#finish-button').hidden = ['completed', 'finalizing'].includes(m.status);
   $('#restart-button').hidden = !(investigating(m) && m.status === 'paused'); $('#meeting-error').hidden = !m.error; if (m.error) renderError($('#meeting-error'), m.error);
-  $('#message-input').disabled = ['completed', 'finalizing'].includes(m.status); $('#composer button').disabled = $('#message-input').disabled; $('#compose-note').textContent = t(investigating(m) ? 'composer.independent' : m.status === 'running' ? 'composer.running' : 'composer.normal');
-  summaryOptions($('#meeting-leader'), m.participants, m.leader || m.summarizer || m.participants[0]); $('#meeting-leader').disabled = m.status === 'finalizing';
-  $('#output-language-label').textContent = t('meeting.output', { language: i18n.manifest.languages.find(p => p.id === m.outputLanguage)?.name || t('language.system') });
+  $('#composer-label').textContent = t(m.status === 'completed' ? 'composer.question' : 'composer.label'); $('#compose-note').textContent = t(m.status === 'completed' ? 'composer.continue' : investigating(m) ? 'composer.independent' : m.status === 'running' ? 'composer.running' : 'composer.normal');
+  summaryOptions($('#meeting-leader'), m.participants, m.leader || m.summarizer || m.participants[0]); $('#meeting-leader').disabled = m.status === 'finalizing' || followupBusy(m);
+  $('#output-language-label').textContent = t('meeting.output', { language: ['auto', 'system'].includes(m.languageChoice) ? t('language.questioner') : i18n.manifest.languages.find(p => p.id === (m.outputLanguage || m.languageChoice))?.name || t('language.questioner') });
   $('[data-tab=reports]').hidden = m.mode !== 'independent'; for (const b of document.querySelectorAll('[data-tab]')) b.setAttribute('aria-selected', String(b.dataset.tab === state.tab));
   for (const tab of ['discussion', 'reports', 'decision']) $('#' + tab + '-panel').hidden = state.tab !== tab;
   const progress = $('#investigation-progress'); progress.hidden = !investigating(m); if (!progress.hidden) { progress.className = 'investigation-status'; progress.replaceChildren(element('strong', t('reports.progress', { completed: m.participants.filter(p => activeReport(m, p)).length, total: m.participants.filter(p => !m.skipped.includes(p)).length })), element('p', t('reports.wait'), 'muted')); }
-  renderMessages(); renderEvidence(); renderResearch(); renderReports(); renderDecision();
+  renderMessages(); renderEvidence(); renderResearch(); renderReports(); renderDecision(); renderOrganizer(); renderFollowups();
 }
 function updateMode() {
   const independent = $('#mode-input').value === 'independent'; $('#mode-note').hidden = !independent; $('#timeout-row').hidden = !independent;
-  for (const p of state.config.providers) { const input = $('#provider-' + p.id); input.disabled = !p.executable || (independent && !p.independent); if (input.disabled) input.checked = false; }
+  const organizer = $('#organizer-input').value;
+  for (const p of state.config.providers) { const input = $('#provider-' + p.id); input.disabled = p.id === organizer || !p.executable || (independent && !p.independent); if (input.disabled) input.checked = false; $('#model-' + p.id).disabled = input.disabled; }
+  const selected = state.config.organizers?.find(p => p.id === organizer); $('#organizer-status').textContent = selected ? `${selected.name} · ${label(selected.status)}${selected.status === 'needs_login' ? ' · ' + t('organizer.login') : ''}` : ''; $('#organizer-model').disabled = !organizer;
   const participants = [...document.querySelectorAll('input[name=participant]:checked')].map(n => n.value); summaryOptions($('#leader-input'), participants, $('#leader-input').value);
 }
 function renderConfig(preserve = true) {
+  organizerOptions($('#organizer-input'), preserve ? $('#organizer-input').value : state.config.defaultOrganizer);
   const prior = preserve ? [...document.querySelectorAll('input[name=participant]:checked')].map(n => n.value) : null;
   const modelValues = Object.fromEntries([...document.querySelectorAll('.model-input')].map(n => [n.id, n.value]));
   const overview = $('#provider-overview'), choices = $('#provider-choices'); overview.replaceChildren(); choices.replaceChildren();
@@ -116,7 +169,7 @@ function renderConfig(preserve = true) {
   }
   updateMode();
 }
-async function applyPreferences(preferences) { state.config.preferences = preferences; i18n.set(preferences); i18n.apply(); languageOptions($('#interface-language'), preferences.languageChoice); const meetingChoice = $('#meeting-language').value; languageOptions($('#meeting-language'), meetingChoice || preferences.languageChoice); renderConfig(); render(); $('#connection').textContent = t(state.connected ? 'connection.connected' : 'connection.reconnecting'); }
+async function applyPreferences(preferences) { state.config.preferences = preferences; i18n.set(preferences); i18n.apply(); languageOptions($('#interface-language'), preferences.languageChoice); const meetingChoice = $('#meeting-language').value; languageOptions($('#meeting-language'), meetingChoice || 'auto', true); renderConfig(); render(); $('#connection').textContent = t(state.connected ? 'connection.connected' : 'connection.reconnecting'); }
 async function listen() {
   state.eventAbort = new AbortController();
   try { const response = await fetch(state.url + '/api/events', { headers: { Authorization: `Bearer ${state.token}` }, signal: state.eventAbort.signal }); if (!response.ok) throw new Error(t('error.request')); const reader = response.body.getReader(), decoder = new TextDecoder(); let buffer = '';
@@ -127,14 +180,19 @@ for (const selector of ['#new-button', '#welcome-new']) $(selector).onclick = op
 document.querySelectorAll('[data-close]').forEach(b => b.onclick = () => $('#' + b.dataset.close).close());
 document.querySelectorAll('[data-tab]').forEach(b => b.onclick = () => { state.tab = b.dataset.tab; render(); });
 $('#mode-input').onchange = updateMode;
-$('#new-form').onsubmit = async e => { e.preventDefault(); try { const participants = [...document.querySelectorAll('input[name=participant]:checked')].map(n => n.value); if (participants.length < 2) throw new Error(t('error.selectParticipants')); const models = Object.fromEntries(participants.map(id => [id, $('#model-' + id).value.trim()]).filter(([, m]) => m)); const meeting = await action('/api/meetings', { topic: $('#topic-input').value, participants, models, maxRounds: Number($('#round-input').value), mode: $('#mode-input').value, leader: $('#leader-input').value, languageChoice: $('#meeting-language').value, investigationTimeoutMinutes: Number($('#timeout-input').value) }); $('#new-dialog').close(); $('#topic-input').value = ''; state.meetings = await api('/api/meetings'); setCurrent(meeting); } catch (error) { if (!error.code) messageError(error); } };
-$('#composer').onsubmit = async e => { e.preventDefault(); try { state.current = await action(`/api/meetings/${state.current.id}/messages`, { text: $('#message-input').value }); $('#message-input').value = ''; render(); } catch {} };
+$('#organizer-input').onchange = updateMode;
+$('#new-form').onsubmit = async e => { e.preventDefault(); try { const participants = [...document.querySelectorAll('input[name=participant]:checked')].map(n => n.value); if (participants.length < 2) throw new Error(t('error.selectParticipants')); const models = Object.fromEntries(participants.map(id => [id, $('#model-' + id).value.trim()]).filter(([, m]) => m)); const meeting = await action('/api/meetings', { topic: $('#topic-input').value, participants, models, organizer: $('#organizer-input').value || null, organizerModel: $('#organizer-model').value.trim(), maxRounds: Number($('#round-input').value), mode: $('#mode-input').value, leader: $('#leader-input').value, languageChoice: $('#meeting-language').value, investigationTimeoutMinutes: Number($('#timeout-input').value) }); $('#new-dialog').close(); $('#topic-input').value = ''; state.meetings = await api('/api/meetings'); setCurrent(meeting); } catch (error) { if (!error.code) messageError(error); } };
+$('#composer').onsubmit = async e => { e.preventDefault(); try { const m = state.current, completed = m.status === 'completed'; state.current = await action(`/api/meetings/${m.id}/${completed ? 'followups' : 'messages'}`, { text: $('#message-input').value, ...(completed ? { target: $('#followup-target').value, replyTo: $('#composer').dataset.replyTo || '' } : {}) }); state.followupDrafts[m.id] = { text: '', target: $('#followup-target').value, replyTo: '' }; render(); } catch {} };
 for (const verb of ['start', 'pause', 'finish']) $('#' + verb + '-button').onclick = async () => { try { state.current = await action(`/api/meetings/${state.current.id}/${verb}`); render(); } catch {} };
 $('#meeting-leader').onchange = async () => { try { state.current = await action(`/api/meetings/${state.current.id}/leader`, { participant: $('#meeting-leader').value }); render(); } catch {} };
-$('#restart-button').onclick = () => { $('#restart-topic').value = state.current.topic; languageOptions($('#restart-language'), state.current.languageChoice); $('#restart-dialog').showModal(); };
+$('#meeting-organizer').onchange = async () => { try { state.current = await action(`/api/meetings/${state.current.id}/organizer`, { organizer: $('#meeting-organizer').value || null, model: '' }); render(); } catch { render(); } };
+$('#message-input').oninput = saveFollowupDraft;
+$('#followup-target').onchange = () => { $('#composer').dataset.replyTo = ''; saveFollowupDraft(); renderFollowups(); };
+$('#cancel-followup').onclick = async () => { try { state.current = await action(`/api/meetings/${state.current.id}/followup-cancel`); render(); } catch {} };
+$('#restart-button').onclick = () => { $('#restart-topic').value = state.current.topic; languageOptions($('#restart-language'), state.current.languageChoice, true); $('#restart-dialog').showModal(); };
 $('#restart-form').onsubmit = async e => { e.preventDefault(); try { state.current = await action(`/api/meetings/${state.current.id}/restart`, { topic: $('#restart-topic').value, languageChoice: $('#restart-language').value }); $('#restart-dialog').close(); render(); } catch {} };
 $('#interface-language').onchange = async () => { try { await applyPreferences(await api('/api/preferences', { method: 'PUT', body: JSON.stringify({ languageChoice: $('#interface-language').value }) })); } catch (e) { messageError(e); } };
-window.addEventListener('focus', async () => { if (!state.config) return; try { const prefs = await api('/api/preferences'); if (prefs.language !== i18n.language || prefs.languageChoice !== i18n.choice) await applyPreferences(prefs); } catch {} });
+window.addEventListener('focus', async () => { if (!state.config) return; try { state.config = await api('/api/config'); const prefs = state.config.preferences; if (prefs.language !== i18n.language || prefs.languageChoice !== i18n.choice) await applyPreferences(prefs); else { renderConfig(); render(); } } catch {} });
 $('#settings-button').onclick = async () => { try { state.config = await api('/api/config'); $('#skill-info').textContent = state.config.capabilities.directory + '\n' + t('shared.version', { hash: state.config.capabilities.skillHash.slice(0, 12) }); $('#mcp-config').value = JSON.stringify(state.config.capabilities.config, null, 2); $('#settings-dialog').showModal(); } catch (e) { messageError(e); } };
 $('#save-settings').onclick = async () => { try { await api('/api/capabilities', { method: 'PUT', body: JSON.stringify(JSON.parse($('#mcp-config').value)) }); $('#settings-dialog').close(); } catch (e) { messageError(e); } };
 $('#export-button').onclick = async () => { try { if (window.roundtableDesktop) await window.roundtableDesktop.exportMeeting(state.current.id); else { const data = await api(`/api/meetings/${state.current.id}/export`), blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' }), url = URL.createObjectURL(blob), a = element('a'); a.href = url; a.download = `roundtable-${state.current.id}.json`; a.click(); setTimeout(() => URL.revokeObjectURL(url), 1000); } } catch (e) { messageError(e); } };

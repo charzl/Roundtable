@@ -9,12 +9,14 @@
 <section id="welcome" class="welcome"><div class="eyebrow" data-i18n="welcome.eyebrow"></div><h1 data-i18n="welcome.title"></h1><p data-i18n="welcome.body"></p><button id="welcome-new" class="primary" data-i18n="welcome.start"></button><div id="provider-overview"></div></section>
 <section id="meeting" hidden>
 <div class="meeting-heading"><div><div class="eyebrow" id="round-label"></div><h1 id="topic"></h1></div><button id="export-button" data-i18n="export"></button></div>
-<div class="meeting-settings"><label for="meeting-leader" data-i18n="meeting.leader"></label><select id="meeting-leader"></select><span id="output-language-label" class="muted"></span></div>
+<div class="meeting-settings"><label for="meeting-organizer" data-i18n="organizer.label"></label><select id="meeting-organizer"></select><label for="meeting-leader" data-i18n="meeting.leader"></label><select id="meeting-leader"></select><span id="output-language-label" class="muted"></span></div>
+<p class="muted" data-i18n="organizer.roles"></p>
+<div id="organizer-notes"></div>
 <div class="tabs" role="tablist"><button role="tab" aria-selected="true" data-tab="discussion" data-i18n="tab.discussion"></button><button role="tab" aria-selected="false" data-tab="reports" data-i18n="tab.reports" hidden></button><button role="tab" aria-selected="false" data-tab="decision" data-i18n="tab.decision"></button></div>
 <div class="controls"><span id="turn-state" aria-live="polite"></span><div><button id="start-button" class="primary"></button><button id="pause-button" data-i18n="action.pause"></button><button id="restart-button" data-i18n="action.restart" hidden></button><button id="finish-button" data-i18n="action.finish"></button></div></div>
 <div id="history-notice" class="error" role="status" hidden></div>
 <div id="meeting-error" class="error" hidden></div><div id="investigation-progress" hidden></div>
-<section id="discussion-panel"><div id="messages"></div><div id="pending"></div><form id="composer"><label for="message-input" data-i18n="composer.label"></label><textarea id="message-input" rows="3" data-i18n-placeholder="composer.placeholder" maxlength="12000"></textarea><div class="compose-actions"><span id="compose-note"></span><button type="submit" class="primary" data-i18n="composer.submit"></button></div></form></section>
+<section id="discussion-panel"><div id="messages"></div><div id="followup-messages"></div><div id="pending"></div><form id="composer"><div id="answer-routing" hidden><label for="followup-target" data-i18n="followup.target"></label><select id="followup-target"></select></div><div id="followup-reference" class="reply" hidden></div><label id="composer-label" for="message-input" data-i18n="composer.label"></label><textarea id="message-input" rows="3" data-i18n-placeholder="composer.placeholder" maxlength="12000"></textarea><div class="compose-actions"><span id="compose-note"></span><button id="cancel-followup" type="button" data-i18n="followup.cancel" hidden></button><button type="submit" class="primary" data-i18n="composer.submit"></button></div></form></section>
 <section id="reports-panel" hidden></section><section id="decision-panel" hidden></section>
 </section>
 </main>
@@ -22,6 +24,9 @@
 </div>
 <dialog id="new-dialog"><form id="new-form"><div class="dialog-header"><h2 data-i18n="new.title"></h2><button type="button" data-close="new-dialog" data-i18n-aria="action.close">×</button></div><label for="topic-input" data-i18n="new.topic"></label><textarea id="topic-input" rows="4" required maxlength="12000" data-i18n-placeholder="new.placeholder"></textarea>
 <div class="form-row"><label for="mode-input" data-i18n="new.mode"></label><select id="mode-input"><option value="discussion" data-i18n="mode.discussion"></option><option value="independent" data-i18n="mode.independent"></option></select></div><p id="mode-note" class="muted" data-i18n="new.modeNote" hidden></p>
+<div class="form-row"><label for="organizer-input" data-i18n="organizer.label"></label><select id="organizer-input"></select></div>
+<input id="organizer-model" type="text" maxlength="160" data-i18n-placeholder="organizer.model" data-i18n-aria="organizer.model">
+<p class="muted" data-i18n="organizer.roles"></p><p id="organizer-status" class="muted"></p>
 <fieldset><legend data-i18n="new.participants"></legend><div id="provider-choices"></div></fieldset>
 <div class="form-row"><label for="leader-input" data-i18n="new.leader"></label><select id="leader-input" required></select></div>
 <div class="form-row"><label for="round-input" data-i18n="new.rounds"></label><input id="round-input" type="number" min="1" max="10" value="10" required></div>

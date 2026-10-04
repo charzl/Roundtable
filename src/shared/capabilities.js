@@ -31,18 +31,18 @@ export class Capabilities {
     const file = join(this.root, 'mcp-secrets.json');
     return existsSync(file) ? JSON.parse(readFileSync(file, 'utf8'))[reference] : undefined;
   }
-  prepare({ meetingDir, callDir, participant, callId, snapshot, messages = [], research = [], independent = false }) {
+  prepare({ meetingDir, callDir, participant, callId, snapshot, messages = [], research = [], independent = false, organizer = false }) {
     const token = randomUUID();
     const scopeDir = join(callDir, 'scope'); mkdirSync(scopeDir, { recursive: true, mode: 0o700 });
     writeFileSync(join(scopeDir, 'access.json'), JSON.stringify({ token, participant, callId }), { mode: 0o600 });
     writeFileSync(join(scopeDir, 'meeting.json'), JSON.stringify({ messages }), { mode: 0o600 });
     writeFileSync(join(scopeDir, 'research.jsonl'), research.map(e => JSON.stringify(e)+'\n').join(''), { mode: 0o600 });
     const env = { ELECTRON_RUN_AS_NODE: '1', ROUNDTABLE_MEETING_DIR: scopeDir, ROUNDTABLE_TOKEN: token, ROUNDTABLE_PARTICIPANT: participant, ROUNDTABLE_CALL_ID: callId };
-    const servers = { roundtable: { command: this.nodePath, args: [resolve(dirname(fileURLToPath(import.meta.url)), 'mcp-server.js')], env } };
+    const servers = organizer ? {} : { roundtable: { command: this.nodePath, args: [resolve(dirname(fileURLToPath(import.meta.url)), 'mcp-server.js')], env } };
     for (const [name, cfg] of Object.entries(snapshot.config.mcpServers)) {
       // External shared memory cannot establish independent investigations.
       // First implementation excludes external MCP during this phase.
-      if (independent || cfg.enabled === false) continue;
+      if (organizer || independent || cfg.enabled === false) continue;
       const safe = { ...cfg }; delete safe.envRefs; delete safe.enabled;
       if (cfg.envRefs) {
         safe.env = { ...safe.env };

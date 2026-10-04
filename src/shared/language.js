@@ -1,4 +1,18 @@
 export const LANGUAGE_CHOICES = ['system', 'zh-Hans', 'en'];
+// Meeting language is independent of the interface. Legacy "system" meetings
+// follow the question on future calls; their original answers remain unchanged.
+export function questionLanguage(text, fallback = 'en') {
+  const prose = String(text).replace(/```[\s\S]*?```/g, '').replace(/https?:\/\/\S+/g, '');
+  const chinese = (prose.match(/\p{Script=Han}/gu) || []).length;
+  const english = (prose.match(/[A-Za-z]+/g) || []).length;
+  if (chinese >= 2 && chinese >= english) return 'zh-Hans';
+  if (english >= 2) return 'en';
+  return fallback;
+}
+export function resolveMeetingLanguage(choice = 'auto', question = '', preferred = [], supported = ['zh-Hans', 'en']) {
+  if (['auto', 'system'].includes(choice)) return questionLanguage(question, resolveLanguage('system', preferred, supported));
+  return resolveLanguage(choice, preferred, supported);
+}
 export function resolveLanguage(choice = 'system', preferred = [], supported = ['zh-Hans', 'en']) {
   if (choice !== 'system' && !supported.includes(choice)) throw new Error('无效语言选项');
   if (choice !== 'system') return choice;

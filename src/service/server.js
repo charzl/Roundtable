@@ -6,7 +6,7 @@ import { randomBytes, timingSafeEqual } from 'node:crypto';
 import { Store } from './store.js';
 import { Meetings } from './meeting.js';
 import { Capabilities } from '../shared/capabilities.js';
-import { inventory, resolveExecutable } from '../providers/cli.js';
+import { inventory, organizerInventory, DEFAULT_ORGANIZER, resolveExecutable } from '../providers/cli.js';
 import { resolveLanguage } from '../shared/language.js';
 const uiDir = resolve(dirname(fileURLToPath(import.meta.url)), '../../ui');
 async function body(request) {
@@ -45,7 +45,7 @@ export async function startService({ dataDir, port = 0, runner, nodePath, getSys
         res.writeHead(200, { 'Content-Type': 'text/event-stream', 'Cache-Control': 'no-cache', Connection: 'keep-alive' });
         res.write(': connected\n\n'); clients.add(res); req.on('close', () => clients.delete(res)); return;
       }
-      if (req.method === 'GET' && url.pathname === '/api/config') return json({ providers: inventory(), capabilities: capabilities.info(), maxRounds: 10, preferences: preferences() });
+      if (req.method === 'GET' && url.pathname === '/api/config') return json({ providers: inventory(), organizers: organizerInventory(), defaultOrganizer: DEFAULT_ORGANIZER, capabilities: capabilities.info(), maxRounds: 10, preferences: preferences() });
       if (url.pathname === '/api/preferences') {
         if (req.method === 'GET') return json(preferences());
         if (req.method === 'PUT') {
@@ -62,7 +62,7 @@ export async function startService({ dataDir, port = 0, runner, nodePath, getSys
         if (req.method === 'GET') return json(meetings.list());
         if (req.method === 'POST') return json(meetings.create(await body(req)), 201);
       }
-      const match = url.pathname.match(/^\/api\/meetings\/([a-zA-Z0-9-]+)(?:\/(start|pause|finish|messages|export|leader|summarizer|skip|retry|restart|summary|decision))?$/);
+      const match = url.pathname.match(/^\/api\/meetings\/([a-zA-Z0-9-]+)(?:\/(start|pause|finish|messages|export|leader|summarizer|skip|retry|restart|summary|decision|organizer|followups|followup-retry|followup-cancel))?$/);
       if (match) {
         const [,id,action] = match;
         if (req.method === 'GET' && !action) return json(meetings.view(id));
@@ -71,6 +71,10 @@ export async function startService({ dataDir, port = 0, runner, nodePath, getSys
           return json(meetings.export(id));
         }
         if (req.method === 'POST') {
+          if (action === 'organizer') return json(meetings.setOrganizer(id, await body(req)));
+          if (action === 'followups') return json(meetings.followup(id, await body(req)));
+          if (action === 'followup-retry') return json(meetings.retryFollowup(id, await body(req)));
+          if (action === 'followup-cancel') return json(meetings.cancelFollowup(id));
           if (action === 'messages') return json(meetings.send(id, (await body(req)).text));
           if (action === 'leader' || action === 'summarizer') return json(meetings.setLeader(id, (await body(req)).participant));
           if (action === 'skip') return json(meetings.skip(id, (await body(req)).participant));

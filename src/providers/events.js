@@ -12,11 +12,11 @@ export function extractChunkText(event) {
 export function extractSessionId(event) {
   return event.session_id || (event.type === 'thread.started' ? event.thread_id : null);
 }
-export function parseEvents(raw) {
+export function parseEvents(raw, { provider } = {}) {
   const events = raw.split('\n').filter(Boolean).flatMap(line => {
     try { return [JSON.parse(line)]; } catch { return []; }
   });
-  const error = events.find(e => (e.event === 'result' && e.result?.status !== 'SUCCESS') || e.type === 'turn.failed' || (e.type === 'result' && (e.is_error || e.subtype?.startsWith('error'))));
+  const error = events.find(e => (e.event === 'result' && e.result?.status !== 'SUCCESS') || e.type === 'turn.failed' || (provider === 'cursor' && e.type === 'error') || (e.type === 'result' && (e.is_error || e.subtype?.startsWith('error'))));
   const agyResult = events.findLast(e => e.event === 'result');
   const terminal = events.findLast(e => e.type === 'result') || events.findLast(e => e.type === 'turn.completed') || agyResult;
   let text = typeof terminal?.result === 'string' ? terminal.result : '';
@@ -31,12 +31,12 @@ export function parseEvents(raw) {
   }
   if (!text) text = events.filter(e => e.type === 'item.completed' && e.item?.type === 'agent_message').at(-1)?.item.text || events.map(extractChunkText).filter(Boolean).join('\n');
   return {
-    text, events, completed: !!terminal && !error,
-    error: error ? JSON.stringify(error.error || error.result || error.subtype).slice(0, 1200) : null,
+    text, events, completed: !!terminal && !error && (provider !== 'cursor' || (terminal.type === 'result' && terminal.subtype === 'success' && terminal.is_error === false)),
+    error: error ? JSON.stringify(error.error || error.result || error.message || error.subtype || { type: error.type }).slice(0, 1200) : null,
     sessionId: events.map(extractSessionId).find(Boolean) || agyResult?.result?.conversation_id || null,
     model: events.find(e => e.model)?.model || events.find(e => e.message?.model)?.message.model || null,
     toolCalls: events.filter(e => (e.type === 'item.completed' && /tool_call|command_execution|web_search/.test(e.item?.type || '')) ||
-      (e.type === 'assistant' && e.message?.content?.some(c => c.type === 'tool_use')) || (e.event === 'step_update' && e.step_update?.step_type === 'tool' && e.step_update?.state === 'DONE')),
+      (e.type === 'tool_call' && e.subtype === 'completed') || (e.type === 'assistant' && e.message?.content?.some(c => c.type === 'tool_use')) || (e.event === 'step_update' && e.step_update?.step_type === 'tool' && e.step_update?.state === 'DONE')),
   };
 }
 export function parseAnswer(text) {
