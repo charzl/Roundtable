@@ -5,9 +5,6 @@
  * 1. Swift Native macOS App (SwiftUI/AppKit) - ~0.48 MB
  * 2. Python / PySide6 Native Desktop App - ~27 MB
  *
- * Archived Reference Stack:
- * 3. JavaScript / Electron (Deprecated Reference) - ~123 MB
- *
  * Collects all artifacts into root `dist/` with consolidated checksums and manifest.
  */
 
@@ -32,7 +29,7 @@ console.log('===================================================================
 const results = [];
 
 // 1. Package Swift Native (Primary macOS Stack)
-console.log('🍎 [1/3] 打包 Swift Native 原生 macOS 客户端 (Primary)...');
+console.log('🍎 [1/2] 打包 Swift Native 原生 macOS 客户端 (Primary)...');
 try {
   execSync('bash swift/package.sh', { stdio: 'inherit', cwd: root });
   const swiftDist = join(root, 'swift/dist');
@@ -50,7 +47,7 @@ try {
 }
 
 // 2. Package Python / PySide6 (Primary Cross-Platform Stack)
-console.log('\n🐍 [2/3] 打包 Python + PySide6 原生客户端 (Primary)...');
+console.log('\n🐍 [2/2] 打包 Python + PySide6 原生客户端 (Primary)...');
 try {
   execSync('python3 python/package.py', { stdio: 'inherit', cwd: root });
   const pyDist = join(root, 'python/dist');
@@ -67,29 +64,7 @@ try {
   results.push({ stack: 'Python (PySide6)', status: 'failed', error: e.message });
 }
 
-// 3. Package JavaScript / Electron (Deprecated Reference - Only if explicitly requested)
-if (process.env.PACKAGE_DEPRECATED_JS === 'true') {
-  console.log('\n📦 [3/3] 打包 JavaScript / Electron 客户端 (已废弃供参考 / Deprecated Reference)...');
-  try {
-    execSync('npm --prefix javascript-deprecated run package:mac', { stdio: 'inherit', cwd: root });
-    const jsDist = existsSync(join(root, 'javascript-deprecated/dist')) ? join(root, 'javascript-deprecated/dist') : rootDist;
-    for (const f of readdirSync(jsDist)) {
-      if (f.startsWith('Roundtable-') && !f.includes('PySide') && !f.includes('Swift')) {
-        const src = join(jsDist, f);
-        const dest = join(rootDist, f);
-        if (src !== dest && statSync(src).isFile()) cpSync(src, dest);
-      }
-    }
-    results.push({ stack: 'JavaScript (Electron, Deprecated)', status: 'success' });
-  } catch (e) {
-    console.error('⚠️ JavaScript 打包出错:', e.message);
-    results.push({ stack: 'JavaScript (Electron, Deprecated)', status: 'failed', error: e.message });
-  }
-} else {
-  console.log('\n📦 [3/3] 跳过已废弃的 JavaScript / Electron 客户端打包 (保留代码供参考，可设 PACKAGE_DEPRECATED_JS=true 开启)...');
-}
-
-// 4. Consolidate Checksums & Manifest
+// 3. Consolidate Checksums & Manifest
 console.log('\n📝 正在生成全套分发校验清单 / Consolidating checksums and manifest...');
 
 const allFiles = readdirSync(rootDist).filter(f => f.endsWith('.dmg') || f.endsWith('.zip'));
@@ -108,13 +83,8 @@ for (const file of allFiles.sort()) {
   let category = 'Primary';
   if (file.includes('Swift')) {
     stack = 'Swift Native (macOS)';
-    category = 'Primary';
   } else if (file.includes('PySide6')) {
     stack = 'Python (PySide6)';
-    category = 'Primary';
-  } else {
-    stack = 'JavaScript (Electron)';
-    category = 'Deprecated Reference';
   }
 
   manifestEntries.push({

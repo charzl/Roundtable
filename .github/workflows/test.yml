@@ -48,19 +48,6 @@ jobs:
         if: matrix.os == 'macos-14'
         run: swift build --package-path swift
 
-      - name: Set up Node.js 22 (for Deprecated JS Archive Reference)
-        uses: actions/setup-node@v4
-        with:
-          node-version: 22
-          cache: 'npm'
-          cache-dependency-path: 'javascript-deprecated/package-lock.json'
-
-      - name: Verify Deprecated JavaScript Archive Reference
-        run: |
-          npm --prefix javascript-deprecated ci
-          npm --prefix javascript-deprecated run check
-          npm --prefix javascript-deprecated test
-
       - name: Generate GitHub Step Summary
         if: always()
         run: |
@@ -73,4 +60,3 @@ jobs:
           else
             echo "- **Primary Stack 2 (Swift)**: ⏭️ Skipped on Linux (macOS Native Target)" >> $GITHUB_STEP_SUMMARY
           fi
-          echo "- **Archived Stack (JavaScript)**: 📦 Deprecated Reference Tests Passed" >> $GITHUB_STEP_SUMMARY
